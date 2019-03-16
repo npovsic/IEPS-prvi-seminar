@@ -1,1 +1,1 @@
-This is the readme.
+Instructions are available at: http://zitnik.si/teaching/wier/PA1.html
