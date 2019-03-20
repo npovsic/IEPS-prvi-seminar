@@ -11,3 +11,12 @@ Installing Selenium and Google Chrome Headless:
 Python multiprocessing:
     - https://docs.python.org/2/library/multiprocessing.html#multiprocessing-programming
     - https://sebastianraschka.com/Articles/2014_multiprocessing.html
+    
+PostgreSQL:
+    - https://www.postgresql.org/download/
+    
+    - http://www.postgresqltutorial.com/postgresql-python/connect/
+    
+    - https://pynative.com/psycopg2-python-postgresql-connection-pooling/
+    
+    - do not forget your password when installing postgreSQL, you need it to connect to the correct database
