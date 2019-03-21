@@ -75,8 +75,6 @@ class CrawlerProcess:
 
         self.pages_to_add_to_frontier = []
 
-        self.is_site_new = False
-
         self.run()
 
     def run(self):
@@ -87,8 +85,6 @@ class CrawlerProcess:
         self.robots_parser = None
 
         self.pages_to_add_to_frontier = []
-
-        self.is_site_new = False
 
         # TODO: this is not a sufficient condition, because the frontier may yet be populated by another process
         if self.current_page is None:
@@ -104,8 +100,6 @@ class CrawlerProcess:
 
         if self.site is None:
             # We need to create a new site object
-
-            self.is_site_new = True
 
             robots = self.fetch_robots(domain)
 
