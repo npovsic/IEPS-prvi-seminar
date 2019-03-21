@@ -72,7 +72,6 @@ class CrawlerProcess:
         self.site = None
 
         self.robots_parser = None
-        self.sitemaps = []
 
         self.pages_to_add_to_frontier = []
 
@@ -86,7 +85,6 @@ class CrawlerProcess:
         self.site = None
 
         self.robots_parser = None
-        self.sitemaps = []
 
         self.pages_to_add_to_frontier = []
 
@@ -116,14 +114,14 @@ class CrawlerProcess:
             if robots is not None:
                 self.parse_robots(robots)
 
-            if len(self.sitemaps) > 0:
-                for sitemap_url in self.sitemaps:
-                    response = self.fetch_response(sitemap_url)
+                sitemaps = self.robots_parser.get_sitemaps()
 
-                    if response.status_code is 200:
-                        sitemap = response.text
+                if len(sitemaps) > 0:
+                    for sitemap_url in sitemaps:
+                        sitemap = self.fetch_sitemap(sitemap_url)
 
-                        self.parse_sitemap(response.text)
+                        if sitemap is not None:
+                            self.parse_sitemap(sitemap)
 
             self.site = {
                 "domain": domain,
@@ -217,16 +215,22 @@ class CrawlerProcess:
 
         return None
 
+    def fetch_sitemap(self, sitemap_url):
+        response = self.fetch_response(sitemap_url)
+
+        if response.status_code is 200:
+            # Robots found
+            return response.text
+
+        return None
+
     """
-        This function parsers the robots from memory and populates the self.sitemaps array if the site is new and 
+        This function parsers the robots from memory and populates the sitemaps array if the site is new and 
         sitemaps are available
     """
     def parse_robots(self, robots_text):
         self.robots_parser = RobotFileParser(robots_text)
         self.robots_parser.read()
-
-        if self.is_site_new:
-            self.sitemaps = self.robots_parser.get_sitemaps()
 
     def parse_sitemap(self, sitemap_text):
         print("SITEMAP TEXT", sitemap_text)
