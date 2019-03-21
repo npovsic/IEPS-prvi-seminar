@@ -84,7 +84,7 @@ class CrawlerProcess:
 
         self.pages_to_add_to_frontier = []
 
-        # TODO: this is not a sufficient condition, because the frontier may yet be populated by another process
+        # TODO: this is perhaps not a sufficient condition, because the frontier may yet be populated by another process
         if self.current_page is None:
             print("No page in frontier")
 
@@ -224,7 +224,7 @@ class CrawlerProcess:
         return None
 
     """
-        This function parses the robots.txt from memory
+        This function parses the robots.txt from memory using the modified robotparser class
     """
     def parse_robots(self, robots_text):
         self.robots_parser = RobotFileParser(robots_text)
@@ -250,14 +250,22 @@ class CrawlerProcess:
 
         soup = BeautifulSoup(html_content, 'html.parser')
 
-        """
-            When parsing links, include links from href attributes and onclick Javascript events (e.g. location.href or 
-            document.location). Be careful to correctly extend the relative URLs before adding them to the frontier.
-        """
+        # TODO: Be careful to correctly extend the relative URLs before adding them to the frontier
 
-        """
-            Detect images on a web page only based on img tag, where the src attribute points to an image URL.
-        """
+        anchor_tags = soup.findAll("a")
+
+        print("GET LINKS")
+        for anchor_tag in anchor_tags:
+            href = anchor_tag['href']
+
+        # TODO: get hrefs from onclick Javascript events (e.g. location.href or document.location)
+
+        image_tags = soup.findAll("img")
+
+        for tag in image_tags:
+            image_url = tag['src']
+
+        print("\n\n")
 
     """
         TODO: use a hash algorithm that return a similar value for similar pages
