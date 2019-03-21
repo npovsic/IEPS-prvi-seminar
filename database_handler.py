@@ -130,3 +130,85 @@ class DatabaseHandler:
             if connection is not None:
                 connection.close()
                 print("Database connection closed.")
+
+    def reset_database(self):
+        connection = None
+
+        try:
+            # read connection parameters
+            params = config()
+
+            # connect to the PostgreSQL server
+            print("Connecting to the PostgreSQL database...")
+            connection = psycopg2.connect(**params)
+
+            # create a cursor
+            cursor = connection.cursor()
+
+            # execute a statement
+            cursor.execute(
+                "DELETE FROM crawldb.image"
+            )
+
+            connection.commit()
+
+            # close the communication with the PostgreSQL
+            cursor.close()
+
+            # create a cursor
+            cursor = connection.cursor()
+
+            # execute a statement
+            cursor.execute(
+                "DELETE FROM crawldb.link"
+            )
+
+            connection.commit()
+
+            # close the communication with the PostgreSQL
+            cursor.close()
+
+            # create a cursor
+            cursor = connection.cursor()
+
+            # execute a statement
+            cursor.execute(
+                "DELETE FROM crawldb.page"
+            )
+
+            connection.commit()
+
+            # close the communication with the PostgreSQL
+            cursor.close()
+
+            # create a cursor
+            cursor = connection.cursor()
+
+            # execute a statement
+            cursor.execute(
+                "DELETE FROM crawldb.page_data"
+            )
+
+            connection.commit()
+
+            # close the communication with the PostgreSQL
+            cursor.close()
+
+            # create a cursor
+            cursor = connection.cursor()
+
+            # execute a statement
+            cursor.execute(
+                "DELETE FROM crawldb.site"
+            )
+
+            connection.commit()
+
+            # close the communication with the PostgreSQL
+            cursor.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if connection is not None:
+                connection.close()
+                print("Database connection closed.")

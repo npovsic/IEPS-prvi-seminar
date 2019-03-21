@@ -46,10 +46,12 @@ class CrawlerProcess:
         """
         self.frontier_page = None
 
+        self.page_source = None
+
         self.run()
 
     def run(self):
-        print("Start crawler process")
+        self.page_source = None
 
         self.get_frontier_page()
 
@@ -106,7 +108,7 @@ class CrawlerProcess:
         url = self.frontier_page["url"]
         self.driver.get(url)
 
-        print(self.driver.page_source)
+        self.page_source = self.driver.page_source
 
     def get_domain_url(self, url):
         print("Parse domain")
@@ -120,10 +122,10 @@ class CrawlerProcess:
     def parse_sitemap(self, url):
         print("Parse sitemap")
 
-    def parse_page(self, page_html):
+    def parse_page(self):
         print("Parse page")
 
-        soup = BeautifulSoup(page_html, 'html.parser')
+        soup = BeautifulSoup(self.page_source, 'html.parser')
 
         """
             When parsing links, include links from href attributes and onclick Javascript events (e.g. location.href or 

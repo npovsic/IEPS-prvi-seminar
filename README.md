@@ -27,3 +27,7 @@ PostgreSQL:
     - https://pynative.com/psycopg2-python-postgresql-connection-pooling/
     
 Do not forget your password when installing postgreSQL, you need it to connect to the correct database
+
+BeautifulSoup:
+    
+    - https://www.crummy.com/software/BeautifulSoup/bs4/doc/
