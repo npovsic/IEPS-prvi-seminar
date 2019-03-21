@@ -33,6 +33,8 @@ class DatabaseHandler:
     # TODO: insert all pages at once
     def insert_seed_page(self, seed_page):
         with self.lock:
+            connection = None
+
             try:
                 connection = self.connection_pool.getconn()
 
@@ -51,13 +53,17 @@ class DatabaseHandler:
                 cursor.close()
             except (Exception, psycopg2.DatabaseError) as error:
                 print(error)
+            finally:
+                if connection:
+                    self.connection_pool.putconn(connection)
 
     """
         This function uses the lock so that no two crawler processes have the same frontier url
     """
-
     def get_page_from_frontier(self):
         with self.lock:
+            connection = None
+
             try:
                 connection = self.connection_pool.getconn()
 
@@ -100,12 +106,53 @@ class DatabaseHandler:
                 }
             except (Exception, psycopg2.DatabaseError) as error:
                 print(error)
+            finally:
+                if connection:
+                    self.connection_pool.putconn(connection)
 
     def add_pages_to_frontier(self, pages_to_add):
-        print("Add pages", pages_to_add)
+        with self.lock:
+            connection = None
+
+            try:
+                connection = self.connection_pool.getconn()
+
+                for page in pages_to_add:
+                    try:
+                        print(page)
+
+                        cursor = connection.cursor()
+
+                        cursor.execute(
+                            """
+                                INSERT INTO crawldb.page("url", "page_type_code") 
+                                VALUES(%s, %s);
+                            """,
+                            (page, "FRONTIER")
+                        )
+
+                        connection.commit()
+
+                        cursor.close()
+                    except (Exception, psycopg2.DatabaseError) as error:
+                        print(error)
+
+                        self.connection_pool.putconn(connection)
+
+                        connection = self.connection_pool.getconn()
+            except (Exception, psycopg2.DatabaseError) as error:
+                print(error)
+            finally:
+                if connection:
+                    self.connection_pool.putconn(connection)
+
+
+        # TODO: update link table with from and to values
 
     def update_page(self, current_page):
         with self.lock:
+            connection = None
+
             try:
                 connection = self.connection_pool.getconn()
 
@@ -127,11 +174,16 @@ class DatabaseHandler:
                 cursor.close()
             except (Exception, psycopg2.DatabaseError) as error:
                 print(error)
+            finally:
+                if connection:
+                    self.connection_pool.putconn(connection)
 
     def does_site_exist_in_db(self, url):
         connection = None
 
     def get_site(self, domain):
+        connection = None
+
         try:
             connection = self.connection_pool.getconn()
 
@@ -159,8 +211,13 @@ class DatabaseHandler:
             }
         except (Exception, psycopg2.DatabaseError) as error:
             print(error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
 
     def insert_site(self, site):
+        connection = None
+
         try:
             connection = self.connection_pool.getconn()
 
@@ -183,8 +240,38 @@ class DatabaseHandler:
             return id
         except (Exception, psycopg2.DatabaseError) as error:
             print(error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
+
+    def insert_page_data(self, page_data):
+        connection = None
+
+        try:
+            connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    INSERT INTO crawldb.page_data(page_id, data_type_code, data)
+                    VALUES (%s, %s, %s);
+                """,
+                (page_data["page_id"], page_data["data_type_code"], page_data["data"])
+            )
+
+            connection.commit()
+
+            cursor.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print(error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
 
     def reset_frontier(self):
+        connection = None
+
         try:
             connection = self.connection_pool.getconn()
 
@@ -203,8 +290,13 @@ class DatabaseHandler:
             cursor.close()
         except (Exception, psycopg2.DatabaseError) as error:
             print(error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
 
     def reset_database(self):
+        connection = None
+
         try:
             connection = self.connection_pool.getconn()
 
@@ -228,21 +320,21 @@ class DatabaseHandler:
 
             cursor.close()
 
+            # create a cursor
             cursor = connection.cursor()
 
             cursor.execute(
-                "DELETE FROM crawldb.page"
+                "DELETE FROM crawldb.page_data"
             )
 
             connection.commit()
 
             cursor.close()
 
-            # create a cursor
             cursor = connection.cursor()
 
             cursor.execute(
-                "DELETE FROM crawldb.page_data"
+                "DELETE FROM crawldb.page"
             )
 
             connection.commit()
@@ -260,3 +352,6 @@ class DatabaseHandler:
             cursor.close()
         except (Exception, psycopg2.DatabaseError) as error:
             print(error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
