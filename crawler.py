@@ -232,8 +232,18 @@ class CrawlerProcess:
         self.robots_parser = RobotFileParser(robots_text)
         self.robots_parser.read()
 
-    def parse_sitemap(self, sitemap_text):
-        print("SITEMAP TEXT", sitemap_text)
+    """
+        https://stackoverflow.com/questions/31276001/parse-xml-sitemap-with-python
+        
+        This only works for the standard XML sitemap
+    """
+    def parse_sitemap(self, sitemap_xml):
+        soup = BeautifulSoup(sitemap_xml, 'lxml')
+
+        sitemap_tags = soup.find_all("loc")
+
+        for sitemap_tag in sitemap_tags:
+            url = sitemap_tag.text
 
     def parse_page(self, html_content):
         print("Parse page with BeautifulSoup")
