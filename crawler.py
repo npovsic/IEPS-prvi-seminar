@@ -29,9 +29,11 @@ PAGE_TYPES = {
     "binary": "BINARY",
     "duplicate": "DUPLICATE",
     "frontier": "FRONTIER",
-    "error": "ERROR"
+    "error": "ERROR",
+    "disallowed": "DISALLOWED"
 }
 
+# Only scrape sites in the gov.si domain
 ALLOWED_DOMAIN = ".gov.si"
 
 
@@ -53,7 +55,6 @@ class Crawler:
             p.start()
 
     def create_process(self):
-        # All the processes share the database handler (because of locking)
         crawler_process = CrawlerProcess()
 
 
@@ -86,8 +87,11 @@ class CrawlerProcess:
         """
         self.current_page = self.get_page_from_frontier()
 
+        # TODO: this is perhaps not a sufficient condition, because the frontier may yet be populated by another process
         while self.current_page:
-            self.run()
+            self.crawl()
+
+            # Reset all variables after a page was successfully transferred from the frontier
 
             self.current_page = self.get_page_from_frontier()
 
@@ -99,13 +103,7 @@ class CrawlerProcess:
 
         # TODO: check for spider traps (limit amount of pages from a single site, limit the length of an url)
 
-        # TODO: this is perhaps not a sufficient condition, because the frontier may yet be populated by another process
-        if self.current_page is None:
-            print("No page in frontier")
-
-            return
-
-    def run(self):
+    def crawl(self):
         print("CURRENT URL", self.current_page["url"])
 
         domain = self.get_domain_url(self.current_page["url"])
@@ -120,6 +118,7 @@ class CrawlerProcess:
             sitemap = None
 
             if robots is not None:
+                # Create robots_parser from fetched robots.txt
                 self.parse_robots(robots)
 
                 sitemaps = self.robots_parser.get_sitemaps()
@@ -139,16 +138,25 @@ class CrawlerProcess:
 
             # Insert the new site into database and return the id
             self.site["id"] = database_handler.insert_site(self.site)
-
-        if (self.site["robots_content"] is not None) and (self.robots_parser is None):
-            self.parse_robots(self.site["robots_content"])
+        else:
+            if self.site["robots_content"] is not None:
+                # Create robots_parser from robots.txt saved in the database
+                self.parse_robots(self.site["robots_content"])
 
         self.current_page["site_id"] = self.site["id"]
 
         self.current_page["accessed_time"] = datetime.now()
 
         if self.allowed_to_crawl_current_page(self.current_page["url"]) is False:
-            print("ROBOTS DNO NTO ALLOW THIS SITE TO BE CRAWLED")
+            print("ROBOTS DO NOT ALLOW THIS SITE TO BE CRAWLED")
+
+            self.current_page["page_type_code"] = PAGE_TYPES["disallowed"]
+
+            self.current_page["http_status_code"] = 500
+
+            self.current_page["html_content"] = None
+
+            database_handler.update_page(self.current_page)
 
             return
 
@@ -284,7 +292,6 @@ class CrawlerProcess:
 
         # We need to check fi the returned file is actually a txt file, because some sites route back to the index page
         if response and response.status_code is 200 and CONTENT_TYPES["TXT"] in response.headers['content-type']:
-            # Robots.txt found
             return response.text
 
         return None

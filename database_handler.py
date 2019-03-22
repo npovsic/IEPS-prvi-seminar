@@ -31,35 +31,33 @@ class DatabaseHandler:
             print("ERROR IN DATABASE", error)
 
     def insert_seed_page(self, seed_page):
-        with self.lock:
-            connection = None
+        connection = None
 
-            try:
-                connection = self.connection_pool.getconn()
+        try:
+            connection = self.connection_pool.getconn()
 
-                cursor = connection.cursor()
+            cursor = connection.cursor()
 
-                cursor.execute(
-                    """
-                        INSERT INTO crawldb.page("url", "page_type_code") 
-                        VALUES(%s, %s);
-                    """,
-                    (seed_page, "FRONTIER")
-                )
+            cursor.execute(
+                """
+                    INSERT INTO crawldb.page("url", "page_type_code") 
+                    VALUES(%s, %s);
+                """,
+                (seed_page, "FRONTIER")
+            )
 
-                connection.commit()
+            connection.commit()
 
-                cursor.close()
-            except (Exception, psycopg2.DatabaseError) as error:
-                print("ERROR IN DATABASE", error)
-            finally:
-                if connection:
-                    self.connection_pool.putconn(connection)
+            cursor.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("ERROR IN DATABASE", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
 
     """
-        This function uses the lock so that no two crawler processes have the same frontier url
+        This function uses the lock so that no two crawler processes get the same frontier url
     """
-
     def get_page_from_frontier(self):
         with self.lock:
             connection = None
@@ -110,6 +108,7 @@ class DatabaseHandler:
                 if connection:
                     self.connection_pool.putconn(connection)
 
+    # TODO: update link table with from and to values
     def add_pages_to_frontier(self, pages_to_add):
         with self.lock:
             connection = None
@@ -150,7 +149,6 @@ class DatabaseHandler:
                 if connection:
                     self.connection_pool.putconn(connection)
 
-    # TODO: update link table with from and to values
     def update_page(self, current_page):
         with self.lock:
             connection = None
@@ -181,9 +179,6 @@ class DatabaseHandler:
             finally:
                 if connection:
                     self.connection_pool.putconn(connection)
-
-    def does_site_exist_in_db(self, url):
-        connection = None
 
     def get_site(self, domain):
         connection = None
