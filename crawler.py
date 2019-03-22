@@ -19,21 +19,23 @@ CONTENT_TYPES = {
     "DOCX": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "PPT": "application/vnd.ms-powerpoint",
     "PPTX": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    "A": "a"
+    "A": "a",
+    "TXT": "text/plain"
 }
 
 PAGE_TYPES = {
     "html": "HTML",
     "binary": "BINARY",
     "duplicate": "DUPLICATE",
-    "frontier": "FRONTIER"
+    "frontier": "FRONTIER",
+    "error": "ERROR"
 }
+
+ALLOWED_DOMAIN = ".gov.si"
 
 
 class Crawler:
     def __init__(self, number_of_processes):
-        print("Created crawler")
-
         self.number_of_processes = number_of_processes
 
         with open("seed_pages.txt", "r") as seed_pages:
@@ -56,33 +58,45 @@ class Crawler:
 
 class CrawlerProcess:
     def __init__(self):
-        print("Created crawler process")
+        print("[CREATED CRAWLER PROCESS]")
 
+        # Create the chrome driver with which we will fetch and parse sites
         chrome_options = webdriver.ChromeOptions()
         chrome_options.add_argument("headless")
         self.driver = webdriver.Chrome(chrome_options=chrome_options)
 
-        self.database_handler = database_handler
-
         """
-            frontier page is a dictionary with an id (database id for updating) and url fields
+            site is a dictionary with all the fields from the database (domain, robots_content, sitemap_content)
         """
-        self.current_page = None
         self.site = None
 
+        """
+            robots_parser is an object which allows us to use the robots.txt file
+        """
         self.robots_parser = None
 
+        """
+            Holds all the pages which will be added to the frontier at the end of each run
+        """
         self.pages_to_add_to_frontier = []
 
-        self.run()
-
-    def run(self):
+        """
+            current_page is a dictionary with an id (database id for updating) and url field
+        """
         self.current_page = self.get_page_from_frontier()
-        self.site = None
 
-        self.robots_parser = None
+        while self.current_page:
+            self.run()
 
-        self.pages_to_add_to_frontier = []
+            self.current_page = self.get_page_from_frontier()
+
+            self.site = None
+
+            self.robots_parser = None
+
+            self.pages_to_add_to_frontier = []
+
+        # TODO: check for spider traps (limit amount of pages from a single site, limit the length of an url)
 
         # TODO: this is perhaps not a sufficient condition, because the frontier may yet be populated by another process
         if self.current_page is None:
@@ -90,6 +104,7 @@ class CrawlerProcess:
 
             return
 
+    def run(self):
         print("CURRENT URL", self.current_page["url"])
 
         domain = self.get_domain_url(self.current_page["url"])
@@ -121,6 +136,7 @@ class CrawlerProcess:
                 "sitemap_content": sitemap
             }
 
+            # Insert the new site into database and return the id
             self.site["id"] = database_handler.insert_site(self.site)
 
         if (self.site["robots_content"] is not None) and (self.robots_parser is None):
@@ -130,65 +146,106 @@ class CrawlerProcess:
 
         self.current_page["accessed_time"] = datetime.now()
 
+        if self.allowed_to_crawl_current_page(self.current_page["url"]) is False:
+            print("ROBOTS DNO NTO ALLOW THIS SITE TO BE CRAWLED")
+
+            return
+
         # Fetch a head response so that we can save the http code
         page_response = self.fetch_response(self.current_page["url"])
 
-        content_type = page_response.headers['content-type']
+        print("PAGE RESPONSE", page_response)
 
-        self.current_page["http_status_code"] = page_response.status_code
+        if page_response is not None:
+            content_type = page_response.headers['content-type']
 
-        if CONTENT_TYPES["HTML"] in content_type:
-            # We got an HTML page
+            self.current_page["http_status_code"] = page_response.status_code
 
-            self.current_page["page_type_code"] = PAGE_TYPES["html"]
+            if CONTENT_TYPES["HTML"] in content_type:
+                # We got an HTML page
 
-            self.current_page["html_content"] = self.fetch_rendered_page_source(self.current_page["url"])
+                self.current_page["page_type_code"] = PAGE_TYPES["html"]
 
-            self.check_for_duplication(self.current_page["html_content"])
+                self.current_page["html_content"] = self.fetch_rendered_page_source(self.current_page["url"])
 
-            self.parse_page(self.current_page["html_content"])
+                self.check_for_duplication(self.current_page["html_content"])
+
+                parsed_page = self.parse_page(self.current_page["html_content"])
+
+                if len(parsed_page['links']):
+                    for link in parsed_page['links']:
+
+                        if ALLOWED_DOMAIN in link:
+                            self.add_page_to_frontier_array(link)
+
+                if len(parsed_page['images']):
+                    for image_url in parsed_page['images']:
+                        self.add_page_to_frontier_array(image_url)
+            else:
+                # The crawler detected a binary file
+
+                self.current_page["page_type_code"] = PAGE_TYPES["binary"]
+
+                self.current_page["html_content"] = None
+
+                data_type_code = None
+
+                for code, value in CONTENT_TYPES.items():
+                    if content_type == value:
+                        data_type_code = code
+
+                if data_type_code is None:
+                    # There is a very good chance that we have an image
+
+                    # TODO: check filename and extension to determine if it really is an image
+
+                    filename = ""
+
+                    image_data = {
+                        "page_id": self.current_page["id"],
+                        "content_type": content_type,
+                        "data": page_response.content,
+                        "accessed_time": datetime.now(),
+                        "filename": filename
+                    }
+
+                    self.insert_image_data(image_data)
+                else:
+                    page_data = {
+                        "page_id": self.current_page["id"],
+                        "data_type_code": data_type_code,
+                        "data": page_response.content
+                    }
+
+                    self.insert_page_data(page_data)
         else:
-            # The crawler detected a binary file so a new record in the paga_data table is created
+            self.current_page["page_type_code"] = PAGE_TYPES["error"]
 
-            self.current_page["page_type_code"] = PAGE_TYPES["binary"]
+            self.current_page["http_status_code"] = 500
 
             self.current_page["html_content"] = None
-
-            data_type_code = None
-
-            for code, value in CONTENT_TYPES.items():
-                if content_type == value:
-                    data_type_code = code
-
-            page_data = {
-                "page_id": self.current_page["id"],
-                "data_type_code": data_type_code,
-                "data": page_response.content
-            }
-
-            database_handler.insert_page_data(page_data)
 
         # Update the page in the database, remove FRONTIER type and replace it with the correct one
         database_handler.update_page(self.current_page)
 
-        print("CURRENT PAGE", self.current_page)
-        print("CURRENT SITE", self.site)
-
-        print("\n")
-        print("\n")
-
         self.add_pages_to_frontier()
 
-        # Run the crawler again with a new page from the frontier
-        self.run()
-
     def get_page_from_frontier(self):
-        return self.database_handler.get_page_from_frontier()
+        return database_handler.get_page_from_frontier()
 
     def fetch_response(self, url):
-        response = requests.get(url)
+        response = None
 
-        return response
+        try:
+            # some sites require a certificate to access, which throws an error
+
+            response = requests.get(url)
+
+            return response
+        except requests.exceptions.RequestException as exception:
+            print(exception)
+
+            return None
 
     def fetch_head(self, url):
         response = requests.head(url)
@@ -208,8 +265,9 @@ class CrawlerProcess:
     def fetch_robots(self, domain):
         response = self.fetch_response(domain + "/robots.txt")
 
-        if response.status_code is 200:
-            # Robots found
+        # We need to check fi the returned file is actually a txt file, because some sites route back to the index page
+        if response and response.status_code is 200 and CONTENT_TYPES["TXT"] in response.headers['content-type']:
+            # Robots.txt found
             return response.text
 
         return None
@@ -217,14 +275,15 @@ class CrawlerProcess:
     def fetch_sitemap(self, sitemap_url):
         response = self.fetch_response(sitemap_url)
 
-        if response.status_code is 200:
-            # Robots found
+        if response and response.status_code is 200:
+            # Sitemap found
             return response.text
 
         return None
 
     """
         This function parses the robots.txt from memory using the modified robotparser class
+        The self.robots_parser includes functions to check if the parser is allowed to parse a certain site
     """
     def parse_robots(self, robots_text):
         self.robots_parser = RobotFileParser(robots_text)
@@ -235,48 +294,114 @@ class CrawlerProcess:
         
         This only works for the standard XML sitemap
     """
+    # TODO: error handling
     def parse_sitemap(self, sitemap_xml):
         soup = BeautifulSoup(sitemap_xml, 'lxml')
 
         sitemap_tags = soup.find_all("loc")
 
         for sitemap_tag in sitemap_tags:
-            url = sitemap_tag.text
+            url = self.get_parsed_url(sitemap_tag.text)
 
-            self.add_page_to_frontier_array(url)
+            if url:
+                if ALLOWED_DOMAIN in url:
+                    self.add_page_to_frontier_array(url)
+
+    """
+        Checks if robots are set and if they allow the crawling of the current site
+    """
+    # TODO: use the robots_parser functions
+    def allowed_to_crawl_current_page(self, url):
+        return True
 
     def parse_page(self, html_content):
-        print("Parse page with BeautifulSoup")
+        links = []
+        images = []
 
         soup = BeautifulSoup(html_content, 'html.parser')
 
-        # TODO: Be careful to correctly extend the relative URLs before adding them to the frontier
-
         anchor_tags = soup.findAll("a")
 
-        print("GET LINKS")
         for anchor_tag in anchor_tags:
-            href = anchor_tag['href']
+            if anchor_tag.has_attr('href'):
+                href = anchor_tag['href']
+                
+                url = self.get_parsed_url(href)
 
-        # TODO: get hrefs from onclick Javascript events (e.g. location.href or document.location)
+                if url: 
+                    links.append(url)
 
         image_tags = soup.findAll("img")
 
-        for tag in image_tags:
-            image_url = tag['src']
+        for image_tag in image_tags:
+            if image_tag.has_attr('src'):
+                image_url = self.get_parsed_url(image_tag['src'])
 
-        print("\n\n")
+                if image_url:
+                    images.append(image_url)
+
+        script_tags = soup.findAll('script')
+
+        for script_tag in script_tags:
+            links_from_javascript = self.parse_links_from_javacript(script_tag.text)
+
+            for link in links_from_javascript:
+                links.append(link)
+
+        return {
+            "links": links,
+            "images": images
+        }
+
+    # TODO: get hrefs from onclick Javascript events (e.g. location.href or document.location)
+    def parse_links_from_javacript(self, javascript_text):
+        links = []
+
+        return links
+
+    """
+        TODO: 
+            remove port number
+            add trailing slash
+            fix relative urls
+                if an url starts with / then it should be appended to the domain url
+                if an url does not start with an / then it should be appended to the current page url
+            remove hashes
+            decode characters
+            encode disallowed characters
+            lower-case urls
+            handle actions(email, tel, etc.)
+                hrefs can contain tel, email action and such (used mainly for mobile)
+            handle all urls starting with javascript
+                some hrefs include javascript code in them (looks like javascript:some_code();)
+    """
+    # TODO: parse url
+    def get_parsed_url(self, url):
+        if 'http' not in url:
+            # URL is most likely relative
+            print("URL IS NOT STANDARD", url)
+            
+            return None
+
+        return url
 
     """
         TODO: use a hash algorithm that return a similar value for similar pages
         The duplicate page should not have the html_content value set, page_type_code should be DUPLICATE and
          that's it
     """
+    # TODO: check for duplicates
     def check_for_duplication(self, html_content):
         print("Check duplicated")
 
     def add_page_to_frontier_array(self, page_url):
         self.pages_to_add_to_frontier.append(page_url)
+
+    def insert_page_data(self, page_data):
+        database_handler.insert_page_data(page_data)
+
+    def insert_image_data(self, image_data):
+        print("INSERT IMAGE")
 
     def add_pages_to_frontier(self):
         database_handler.add_pages_to_frontier(self.pages_to_add_to_frontier)

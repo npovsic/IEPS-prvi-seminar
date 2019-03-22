@@ -28,9 +28,8 @@ class DatabaseHandler:
                 print('Connection to database created succesfully')
 
         except (Exception, psycopg2.DatabaseError) as error:
-            print(error)
+            print("ERROR IN DATABASE", error)
 
-    # TODO: insert all pages at once
     def insert_seed_page(self, seed_page):
         with self.lock:
             connection = None
@@ -52,7 +51,7 @@ class DatabaseHandler:
 
                 cursor.close()
             except (Exception, psycopg2.DatabaseError) as error:
-                print(error)
+                print("ERROR IN DATABASE", error)
             finally:
                 if connection:
                     self.connection_pool.putconn(connection)
@@ -105,7 +104,7 @@ class DatabaseHandler:
                     'url': frontier[3]
                 }
             except (Exception, psycopg2.DatabaseError) as error:
-                print(error)
+                print("ERROR IN DATABASE", error)
             finally:
                 if connection:
                     self.connection_pool.putconn(connection)
@@ -119,8 +118,6 @@ class DatabaseHandler:
 
                 for page in pages_to_add:
                     try:
-                        print(page)
-
                         cursor = connection.cursor()
 
                         cursor.execute(
@@ -134,21 +131,25 @@ class DatabaseHandler:
                         connection.commit()
 
                         cursor.close()
+                    except psycopg2.IntegrityError:
+                        # Do not print duplicate key errors
+
+                        self.connection_pool.putconn(connection)
+
+                        connection = self.connection_pool.getconn()
                     except (Exception, psycopg2.DatabaseError) as error:
-                        print(error)
+                        print("ERROR IN DATABASE", error)
 
                         self.connection_pool.putconn(connection)
 
                         connection = self.connection_pool.getconn()
             except (Exception, psycopg2.DatabaseError) as error:
-                print(error)
+                print("ERROR IN DATABASE", error)
             finally:
                 if connection:
                     self.connection_pool.putconn(connection)
 
-
-        # TODO: update link table with from and to values
-
+    # TODO: update link table with from and to values
     def update_page(self, current_page):
         with self.lock:
             connection = None
@@ -171,9 +172,11 @@ class DatabaseHandler:
 
                 connection.commit()
 
+                print("[REMOVED PAGE FROM FRONTIER]", current_page["url"])
+
                 cursor.close()
             except (Exception, psycopg2.DatabaseError) as error:
-                print(error)
+                print("ERROR IN DATABASE", error)
             finally:
                 if connection:
                     self.connection_pool.putconn(connection)
@@ -210,7 +213,7 @@ class DatabaseHandler:
                 "robots_content": site[2]
             }
         except (Exception, psycopg2.DatabaseError) as error:
-            print(error)
+            print("ERROR IN DATABASE", error)
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
@@ -239,7 +242,7 @@ class DatabaseHandler:
 
             return id
         except (Exception, psycopg2.DatabaseError) as error:
-            print(error)
+            print("ERROR IN DATABASE", error)
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
@@ -264,7 +267,7 @@ class DatabaseHandler:
 
             cursor.close()
         except (Exception, psycopg2.DatabaseError) as error:
-            print(error)
+            print("ERROR IN DATABASE", error)
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
@@ -289,7 +292,7 @@ class DatabaseHandler:
 
             cursor.close()
         except (Exception, psycopg2.DatabaseError) as error:
-            print(error)
+            print("ERROR IN DATABASE", error)
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
@@ -351,7 +354,7 @@ class DatabaseHandler:
 
             cursor.close()
         except (Exception, psycopg2.DatabaseError) as error:
-            print(error)
+            print("ERROR IN DATABASE", error)
         finally:
             if connection:
                 self.connection_pool.putconn(connection)

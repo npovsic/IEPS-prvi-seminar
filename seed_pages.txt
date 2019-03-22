@@ -1,4 +1,4 @@
-http://evem.gov.si
+#http://evem.gov.si
 #https://e-uprava.gov.si/
 #https://podatki.gov.si/
 #http://www.e-prostor.gov.si/
@@ -7,3 +7,5 @@ http://evem.gov.si
 #http://prostor3.gov.si/javni
 #https://www.ess.gov.si/
 #http://www.fu.gov.si/
+http://zakonodaja.gov.si/
+https://egp.gu.gov.si/egp/registration.html
