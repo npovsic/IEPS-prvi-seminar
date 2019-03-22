@@ -20,7 +20,8 @@ CONTENT_TYPES = {
     "PPT": "application/vnd.ms-powerpoint",
     "PPTX": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "A": "a",
-    "TXT": "text/plain"
+    "TXT": "text/plain",
+    "IMG": "image"
 }
 
 PAGE_TYPES = {
@@ -157,6 +158,8 @@ class CrawlerProcess:
         print("PAGE RESPONSE", page_response)
 
         if page_response is not None:
+            # No errors while fetching the response
+
             content_type = page_response.headers['content-type']
 
             self.current_page["http_status_code"] = page_response.status_code
@@ -180,9 +183,28 @@ class CrawlerProcess:
 
                 if len(parsed_page['images']):
                     for image_url in parsed_page['images']:
+                        # TODO: check if image is base64
                         self.add_page_to_frontier_array(image_url)
+            elif CONTENT_TYPES["IMG"] in content_type:
+                # We can be pretty sure that we have an image
+
+                self.current_page["page_type_code"] = PAGE_TYPES["binary"]
+
+                self.current_page["html_content"] = None
+
+                filename = self.get_image_filename(self.current_page["url"])
+
+                image_data = {
+                    "page_id": self.current_page["id"],
+                    "content_type": content_type,
+                    "data": page_response.content,
+                    "accessed_time": datetime.now(),
+                    "filename": filename
+                }
+
+                self.insert_image_data(image_data)
             else:
-                # The crawler detected a binary file
+                # The crawler detected a non-image binary file
 
                 self.current_page["page_type_code"] = PAGE_TYPES["binary"]
 
@@ -190,26 +212,13 @@ class CrawlerProcess:
 
                 data_type_code = None
 
+                # Find the correct data_type_code from all the content types
                 for code, value in CONTENT_TYPES.items():
                     if content_type == value:
                         data_type_code = code
 
                 if data_type_code is None:
-                    # There is a very good chance that we have an image
-
-                    # TODO: check filename and extension to determine if it really is an image
-
-                    filename = ""
-
-                    image_data = {
-                        "page_id": self.current_page["id"],
-                        "content_type": content_type,
-                        "data": page_response.content,
-                        "accessed_time": datetime.now(),
-                        "filename": filename
-                    }
-
-                    self.insert_image_data(image_data)
+                    print("Page response content-type is not in CONTENT_TYPES: ", content_type)
                 else:
                     page_data = {
                         "page_id": self.current_page["id"],
@@ -219,6 +228,8 @@ class CrawlerProcess:
 
                     self.insert_page_data(page_data)
         else:
+            # An error occurred while fetching page (SSL certificate error, timeout, etc.)
+
             self.current_page["page_type_code"] = PAGE_TYPES["error"]
 
             self.current_page["http_status_code"] = 500
@@ -261,6 +272,12 @@ class CrawlerProcess:
         parsed_uri = urlparse(url)
 
         return '{uri.scheme}://{uri.netloc}/'.format(uri=parsed_uri)
+
+    # https://stackoverflow.com/questions/10552188/python-split-url-to-find-image-name-and-extension
+    def get_image_filename(self, image_url):
+        filename = image_url.split('/')[-1]
+
+        return filename
 
     def fetch_robots(self, domain):
         response = self.fetch_response(domain + "/robots.txt")
@@ -401,7 +418,7 @@ class CrawlerProcess:
         database_handler.insert_page_data(page_data)
 
     def insert_image_data(self, image_data):
-        print("INSERT IMAGE")
+        database_handler.insert_image_data(image_data)
 
     def add_pages_to_frontier(self):
         database_handler.add_pages_to_frontier(self.pages_to_add_to_frontier)

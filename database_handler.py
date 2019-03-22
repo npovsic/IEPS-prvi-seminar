@@ -59,6 +59,7 @@ class DatabaseHandler:
     """
         This function uses the lock so that no two crawler processes have the same frontier url
     """
+
     def get_page_from_frontier(self):
         with self.lock:
             connection = None
@@ -261,6 +262,32 @@ class DatabaseHandler:
                     VALUES (%s, %s, %s);
                 """,
                 (page_data["page_id"], page_data["data_type_code"], page_data["data"])
+            )
+
+            connection.commit()
+
+            cursor.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("ERROR IN DATABASE", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
+
+    def insert_image_data(self, image_data):
+        connection = None
+
+        try:
+            connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    INSERT INTO crawldb.image(page_id, filename, content_type, data, accessed_time)
+                    VALUES (%s, %s, %s, %s, %s);
+                """,
+                (image_data["page_id"], image_data["filename"], image_data["content_type"], image_data["data"],
+                 image_data["accessed_time"])
             )
 
             connection.commit()
