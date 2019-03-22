@@ -1,10 +1,9 @@
-#http://evem.gov.si
-#https://e-uprava.gov.si/
-#https://podatki.gov.si/
-#http://www.e-prostor.gov.si/
+http://evem.gov.si
+https://e-uprava.gov.si/
+https://podatki.gov.si/
+http://www.e-prostor.gov.si/
 #http://eugo.gov.si/
 #http://www.gov.si/
 #http://prostor3.gov.si/javni
 #https://www.ess.gov.si/
 #http://www.fu.gov.si/
-http://evem.gov.si/evem_static/images/logo_ekp.jpg

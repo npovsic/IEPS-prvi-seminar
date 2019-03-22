@@ -171,7 +171,7 @@ class DatabaseHandler:
 
                 connection.commit()
 
-                print("[REMOVED PAGE FROM FRONTIER]", current_page["url"])
+                print("[TRANSFERRED PAGE FROM FRONTIER]", current_page["url"])
 
                 cursor.close()
             except (Exception, psycopg2.DatabaseError) as error:

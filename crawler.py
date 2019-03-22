@@ -160,10 +160,7 @@ class CrawlerProcess:
 
             return
 
-        # Fetch a head response so that we can save the http code
         page_response = self.fetch_response(self.current_page["url"])
-
-        print("PAGE RESPONSE", page_response)
 
         if page_response is not None:
             # No errors while fetching the response
@@ -248,9 +245,6 @@ class CrawlerProcess:
         database_handler.update_page(self.current_page)
 
         self.add_pages_to_frontier()
-
-    def get_page_from_frontier(self):
-        return database_handler.get_page_from_frontier()
 
     def fetch_response(self, url):
         response = None
@@ -420,6 +414,10 @@ class CrawlerProcess:
 
     def add_page_to_frontier_array(self, page_url):
         self.pages_to_add_to_frontier.append(page_url)
+
+    def get_page_from_frontier(self):
+        # TODO: IMPLEMENT BREADTH-FIRST STRATEGY
+        return database_handler.get_page_from_frontier()
 
     def insert_page_data(self, page_data):
         database_handler.insert_page_data(page_data)
