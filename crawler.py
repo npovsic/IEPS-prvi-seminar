@@ -4,9 +4,9 @@ from selenium import webdriver
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse
 from datetime import datetime
-
 from robotparser import RobotFileParser
 from database_handler import DatabaseHandler
+import re
 
 # Create a global database handler for all processes
 database_handler = DatabaseHandler(0, 100)
@@ -343,10 +343,10 @@ class CrawlerProcess:
         for anchor_tag in anchor_tags:
             if anchor_tag.has_attr('href'):
                 href = anchor_tag['href']
-                
+
                 url = self.get_parsed_url(href)
 
-                if url: 
+                if url:
                     links.append(url)
 
         image_tags = soup.findAll("img")
@@ -371,9 +371,14 @@ class CrawlerProcess:
             "images": images
         }
 
-    # TODO: get hrefs from onclick Javascript events (e.g. location.href or document.location)
     def parse_links_from_javacript(self, javascript_text):
-        links = []
+        links = re.findall(r'(http://|https://)([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?',
+                           javascript_text)
+
+        if not links:
+            return []
+
+        links = [''.join(link) for link in links]
 
         return links
 
@@ -398,7 +403,7 @@ class CrawlerProcess:
         if 'http' not in url:
             # URL is most likely relative
             print("URL IS NOT STANDARD", url)
-            
+
             return None
 
         return url
