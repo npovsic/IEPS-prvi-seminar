@@ -420,7 +420,6 @@ class CrawlerProcess:
         self.pages_to_add_to_frontier.append(page_url)
 
     def get_page_from_frontier(self):
-        # TODO: IMPLEMENT BREADTH-FIRST STRATEGY
         return database_handler.get_page_from_frontier()
 
     def insert_page_data(self, page_data):
