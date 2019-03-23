@@ -328,9 +328,8 @@ class CrawlerProcess:
     """
         Checks if robots are set and if they allow the crawling of the current site
     """
-    # TODO: use the robots_parser functions
     def allowed_to_crawl_current_page(self, url):
-        return True
+        return self.robots_parser.can_fetch('*', url) if self.robots_parser is not None else False
 
     def parse_page(self, html_content):
         links = []
