@@ -2,7 +2,7 @@ from multiprocessing import Process
 import requests
 from selenium import webdriver
 from bs4 import BeautifulSoup
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 from datetime import datetime
 from robotparser import RobotFileParser
 from database_handler import DatabaseHandler
@@ -183,12 +183,10 @@ class CrawlerProcess:
                 if len(parsed_page['links']):
                     for link in parsed_page['links']:
 
-                        if ALLOWED_DOMAIN in link:
-                            self.add_page_to_frontier_array(link)
+                        self.add_page_to_frontier_array(link)
 
                 if len(parsed_page['images']):
                     for image_url in parsed_page['images']:
-                        # TODO: check if image is base64
                         self.add_page_to_frontier_array(image_url)
             elif CONTENT_TYPES["IMG"] in content_type:
                 # We can be pretty sure that we have an image
@@ -322,40 +320,48 @@ class CrawlerProcess:
             url = self.get_parsed_url(sitemap_tag.text)
 
             if url:
-                if ALLOWED_DOMAIN in url:
-                    self.add_page_to_frontier_array(url)
+                self.add_page_to_frontier_array(url)
 
     """
         Checks if robots are set and if they allow the crawling of the current site
     """
     def allowed_to_crawl_current_page(self, url):
-        return self.robots_parser.can_fetch('*', url) if self.robots_parser is not None else False
+        if self.robots_parser is not None:
+            return self.robots_parser.can_fetch('*', url)
 
+        return True
+
+    """
+        Using the chrome driver to fetch all links and image sources, because the driver already returns absolute urls
+    """
     def parse_page(self, html_content):
+        browser = self.driver
+
         links = []
         images = []
 
-        soup = BeautifulSoup(html_content, 'html.parser')
-
-        anchor_tags = soup.findAll("a")
+        anchor_tags = browser.find_elements_by_tag_name("a")
 
         for anchor_tag in anchor_tags:
-            if anchor_tag.has_attr('href'):
-                href = anchor_tag['href']
+            href = anchor_tag.get_attribute("href")
 
-                url = self.get_parsed_url(href)
+            url = self.get_parsed_url(href)
 
-                if url:
-                    links.append(url)
+            if url:
+                links.append(url)
 
-        image_tags = soup.findAll("img")
+        image_tags = browser.find_elements_by_tag_name("img")
 
         for image_tag in image_tags:
-            if image_tag.has_attr('src'):
-                image_url = self.get_parsed_url(image_tag['src'])
+            src = image_tag.get_attribute("src")
+
+            if src:
+                image_url = self.get_parsed_image_url(src)
 
                 if image_url:
                     images.append(image_url)
+
+        soup = BeautifulSoup(html_content, 'html.parser')
 
         script_tags = soup.findAll('script')
 
@@ -381,28 +387,59 @@ class CrawlerProcess:
 
         return links
 
-    """
-        TODO: 
-            remove port number
-            add trailing slash
-            fix relative urls
-                if an url starts with / then it should be appended to the domain url
-                if an url does not start with an / then it should be appended to the current page url
-            remove hashes
-            decode characters
-            encode disallowed characters
-            lower-case urls
-            handle actions(email, tel, etc.)
-                hrefs can contain tel, email action and such (used mainly for mobile)
-            handle all urls starting with javascript
-                some hrefs include javascript code in them (looks like javascript:some_code();)
-    """
-    # TODO: parse url
+    # Create a parsed url (ignore javascript, fix relative urls etc)
     def get_parsed_url(self, url):
+        if url is None or url is "":
+            return None
+
+        current_url = self.current_page["url"]
+
         if 'http' not in url:
             # URL is most likely relative
-            print("URL IS NOT STANDARD", url)
 
+            if 'javascript:' in url:
+                # This is just javascript code inside a href
+                return None
+
+            if ('mailto:' in url) or ('tel:' in url):
+                # This is an action inside a href
+                return None
+
+            if url[0] is "#":
+                # Link starts with a # (it's a target link)
+                return None
+
+            if url is "/":
+                # This is the index page, which we already have in the frontier
+                return None
+
+            # Fix relative urls
+            if url[0] == "/":
+                if current_url[-1] == "/":
+                    # Make sure only one slash is present
+                    url = url[1:]
+            else:
+                if current_url[-1] != "/":
+                    url = "/{}".format(url)
+
+            # Create an absolute url
+            url = "{}{}".format(current_url, url).strip()
+
+        # Remove everything after the hash
+        if "#" in url:
+            url = url.split("#")[0]
+
+        # Encode special characters (https://docs.python.org/2/library/urllib.html#urllib.quote)
+        url = quote(url.encode("UTF-8"), ':/-_.~&?+=')
+
+        return url
+
+    def get_parsed_image_url(self, url):
+        if url is None or url is "":
+            return None
+
+        # Do not parse base64 images
+        if "data:image" in url:
             return None
 
         return url
@@ -417,10 +454,12 @@ class CrawlerProcess:
         print("Check duplicated")
 
     def add_page_to_frontier_array(self, page_url):
-        self.pages_to_add_to_frontier.append({
-            "from": self.current_page["id"],
-            "to": page_url,
-        })
+        if ALLOWED_DOMAIN in page_url:
+            # Only add pages in the allowed domain
+            self.pages_to_add_to_frontier.append({
+                "from": self.current_page["id"],
+                "to": page_url,
+            })
 
     def get_page_from_frontier(self):
         return database_handler.get_page_from_frontier()
