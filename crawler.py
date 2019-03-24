@@ -101,7 +101,7 @@ class CrawlerProcess:
 
             self.pages_to_add_to_frontier = []
 
-        # TODO: check for spider traps (limit amount of pages from a single site, limit the length of an url)
+            # TODO: check for spider traps (limit amount of pages from a single site, limit the length of an url)
 
     def crawl(self):
         print("CURRENT URL", self.current_page["url"])
