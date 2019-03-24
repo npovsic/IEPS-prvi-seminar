@@ -2,7 +2,7 @@ from multiprocessing import Lock
 import psycopg2
 from psycopg2 import pool
 from config import config
-
+from datetime import datetime
 
 class DatabaseHandler:
     def __init__(self, minimum_connections, max_connections):
@@ -73,6 +73,7 @@ class DatabaseHandler:
                     """
                         SELECT * FROM crawldb.page 
                         WHERE page_type_code='FRONTIER' AND active_in_frontier IS NULL
+                        ORDER BY added_to_frontier
                     """
                 )
 
@@ -100,7 +101,8 @@ class DatabaseHandler:
 
                 return {
                     'id': frontier[0],
-                    'url': frontier[3]
+                    'url': frontier[3],
+                    'added': frontier[7],
                 }
             except (Exception, psycopg2.DatabaseError) as error:
                 print("ERROR IN DATABASE", error)
@@ -122,10 +124,10 @@ class DatabaseHandler:
 
                         cursor.execute(
                             """
-                                INSERT INTO crawldb.page("url", "page_type_code") 
-                                VALUES(%s, %s);
+                                INSERT INTO crawldb.page("url", "page_type_code", "added_to_frontier") 
+                                VALUES(%s, %s, %s);
                             """,
-                            (page, "FRONTIER")
+                            (page, "FRONTIER", datetime.now())
                         )
 
                         connection.commit()
