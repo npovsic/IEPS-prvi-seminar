@@ -110,7 +110,31 @@ class DatabaseHandler:
                 if connection:
                     self.connection_pool.putconn(connection)
 
-    # TODO: update link table with from and to values
+    def link_pages(self, from_page, to_page):
+        connection = None
+
+        try:
+            connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    INSERT INTO crawldb.link("from_page", "to_page") 
+                    VALUES(%s, %s)
+                """,
+                (from_page, to_page)
+            )
+
+            connection.commit()
+
+            cursor.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("ERROR IN DATABASE", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
+
     def add_pages_to_frontier(self, pages_to_add):
         with self.lock:
             connection = None
@@ -125,14 +149,20 @@ class DatabaseHandler:
                         cursor.execute(
                             """
                                 INSERT INTO crawldb.page("url", "page_type_code", "added_to_frontier") 
-                                VALUES(%s, %s, %s);
+                                VALUES(%s, %s, %s)
+                                RETURNING id;
                             """,
-                            (page, "FRONTIER", datetime.now())
+                            (page["to"], "FRONTIER", datetime.now())
                         )
 
                         connection.commit()
 
+                        to_page = cursor.fetchone()[0]
+
+                        self.link_pages(page["from"], to_page)
+
                         cursor.close()
+
                     except psycopg2.IntegrityError:
                         # Do not print duplicate key errors
 

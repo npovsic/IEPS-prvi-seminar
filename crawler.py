@@ -417,7 +417,10 @@ class CrawlerProcess:
         print("Check duplicated")
 
     def add_page_to_frontier_array(self, page_url):
-        self.pages_to_add_to_frontier.append(page_url)
+        self.pages_to_add_to_frontier.append({
+            "from": self.current_page["id"],
+            "to": page_url,
+        })
 
     def get_page_from_frontier(self):
         return database_handler.get_page_from_frontier()
