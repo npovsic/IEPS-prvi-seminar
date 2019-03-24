@@ -111,30 +111,29 @@ class DatabaseHandler:
                     self.connection_pool.putconn(connection)
 
     def link_pages(self, from_page, to_page):
-        with self.lock:
-            connection = None
+        connection = None
 
-            try:
-                connection = self.connection_pool.getconn()
+        try:
+            connection = self.connection_pool.getconn()
 
-                cursor = connection.cursor()
+            cursor = connection.cursor()
 
-                cursor.execute(
-                    """
-                        INSERT INTO crawldb.link("from_page", "to_page") 
-                        VALUES(%s, %s)
-                    """,
-                    (from_page, to_page)
-                )
+            cursor.execute(
+                """
+                    INSERT INTO crawldb.link("from_page", "to_page") 
+                    VALUES(%s, %s)
+                """,
+                (from_page, to_page)
+            )
 
-                connection.commit()
+            connection.commit()
 
-                cursor.close()
-            except (Exception, psycopg2.DatabaseError) as error:
-                print("ERROR IN DATABASE", error)
-            finally:
-                if connection:
-                    self.connection_pool.putconn(connection)
+            cursor.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("ERROR IN DATABASE", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
 
     def add_pages_to_frontier(self, pages_to_add):
         with self.lock:
