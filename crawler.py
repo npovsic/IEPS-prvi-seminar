@@ -8,7 +8,7 @@ from robotparser import RobotFileParser
 from database_handler import DatabaseHandler
 import re
 
-# Create a global database handler for all processes
+# Create a global database handler for all processes to share
 database_handler = DatabaseHandler(0, 100)
 
 # https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Complete_list_of_MIME_types
@@ -106,7 +106,7 @@ class CrawlerProcess:
         self.quit()
 
     def crawl(self):
-        print("[CRAWLING PAGE]", self.current_page["url"])
+        print(" [CRAWLING PAGE]", self.current_page["url"])
 
         domain = self.get_domain_url(self.current_page["url"])
 
@@ -122,7 +122,7 @@ class CrawlerProcess:
         self.current_page["site_id"] = self.site["id"]
 
         if self.allowed_to_crawl_current_page(self.current_page["url"]) is False:
-            print("[CRAWLING] Robots do not allow this site to be crawled")
+            print("     [CRAWLING] Robots do not allow this site to be crawled")
 
             self.current_page["page_type_code"] = PAGE_TYPES["disallowed"]
 
@@ -202,7 +202,7 @@ class CrawlerProcess:
                 if data_type_code is None:
                     # The content type is not in the allowed values, therefore we can ignore it
 
-                    print("[CRAWLING] Page response content-type is not in CONTENT_TYPES: ", content_type)
+                    print("     [CRAWLING] Page response content-type is not in CONTENT_TYPES: ", content_type)
                 else:
                     page_data = {
                         "page_id": self.current_page["id"],
@@ -227,6 +227,8 @@ class CrawlerProcess:
         # Add all the links from the page and sitemap to the frontier
         database_handler.add_pages_to_frontier(self.pages_to_add_to_frontier)
 
+        print("     [CRAWLING] Finished crawling")
+
     """
         Fetch a response from the url, so that we get the status code and find out if any errors occur while fetching
         (some sites for example require a certificate to connect, some sites timeout, etc.)
@@ -237,7 +239,7 @@ class CrawlerProcess:
 
             return response
         except requests.exceptions.RequestException as exception:
-            print(exception)
+            print("     [CRAWLING - ERROR]", exception)
 
             return None
 
@@ -516,6 +518,7 @@ class CrawlerProcess:
     def add_page_to_frontier_array(self, page_url):
         if ALLOWED_DOMAIN in page_url:
             # Only add pages in the allowed domain
+
             self.pages_to_add_to_frontier.append({
                 "from": self.current_page["id"],
                 "to": page_url
