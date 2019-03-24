@@ -85,7 +85,7 @@ class CrawlerProcess:
         """
             current_page is a dictionary with an id (database id for updating) and url field
         """
-        self.current_page = self.get_page_from_frontier()
+        self.current_page = database_handler.get_page_from_frontier()
 
         # TODO: this is perhaps not a sufficient condition, because the frontier may yet be populated by another process
         while self.current_page:
@@ -93,7 +93,7 @@ class CrawlerProcess:
 
             # Reset all variables after a page was successfully transferred from the frontier
 
-            self.current_page = self.get_page_from_frontier()
+            self.current_page = database_handler.get_page_from_frontier()
 
             self.site = None
 
@@ -183,7 +183,7 @@ class CrawlerProcess:
                     "filename": filename
                 }
 
-                self.insert_image_data(image_data)
+                database_handler.insert_image_data(image_data)
 
             else:
                 # The crawler detected a non-image binary file
@@ -210,7 +210,7 @@ class CrawlerProcess:
                         "data": page_response.content
                     }
 
-                    self.insert_page_data(page_data)
+                    database_handler.insert_page_data(page_data)
 
         else:
             # An error occurred while fetching page (SSL certificate error, timeout, etc.)
@@ -224,7 +224,8 @@ class CrawlerProcess:
         # Update the page in the database, remove FRONTIER type and replace it with the correct one
         database_handler.remove_page_from_frontier(self.current_page)
 
-        self.add_pages_to_frontier()
+        # Add all the links from the page and sitemap to the frontier
+        database_handler.add_pages_to_frontier(self.pages_to_add_to_frontier)
 
     """
         Fetch a response from the url, so that we get the status code and find out if any errors occur while fetching
@@ -519,18 +520,6 @@ class CrawlerProcess:
                 "from": self.current_page["id"],
                 "to": page_url
             })
-
-    def get_page_from_frontier(self):
-        return database_handler.get_page_from_frontier()
-
-    def insert_page_data(self, page_data):
-        database_handler.insert_page_data(page_data)
-
-    def insert_image_data(self, image_data):
-        database_handler.insert_image_data(image_data)
-
-    def add_pages_to_frontier(self):
-        database_handler.add_pages_to_frontier(self.pages_to_add_to_frontier)
 
     def quit(self):
         self.driver.quit()
