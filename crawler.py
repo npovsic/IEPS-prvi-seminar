@@ -395,7 +395,7 @@ class CrawlerProcess:
         current_url = self.current_page["url"]
 
         if 'http' not in url:
-            # URL is most likely relative
+            # Since the chrome driver returns absolute urls, the url is most likely javascript or action
 
             if 'javascript:' in url:
                 # This is just javascript code inside a href
@@ -413,7 +413,12 @@ class CrawlerProcess:
                 # This is the index page, which we already have in the frontier
                 return None
 
-            # Fix relative urls
+            """
+                Fix relative urls just in case
+                
+                This block is not really implemented correctly, since the relative url is appended to the current url,
+                which is not the root url in most cases
+            """
             if url[0] == "/":
                 if current_url[-1] == "/":
                     # Make sure only one slash is present
