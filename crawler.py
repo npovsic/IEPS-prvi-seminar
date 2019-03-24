@@ -20,13 +20,13 @@ CONTENT_TYPES = {
     "PPT": "application/vnd.ms-powerpoint",
     "PPTX": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
     "A": "a",
-    "TXT": "text/plain",
     "IMG": "image"
 }
 
 PAGE_TYPES = {
     "html": "HTML",
     "binary": "BINARY",
+    "image": "IMAGE",
     "duplicate": "DUPLICATE",
     "frontier": "FRONTIER",
     "error": "ERROR",
@@ -44,7 +44,7 @@ class Crawler:
         with open("seed_pages.txt", "r") as seed_pages:
             for seed_page in seed_pages:
                 if "#" not in seed_page:
-                    database_handler.insert_seed_page(seed_page.strip())
+                    database_handler.add_page_to_frontier(seed_page.strip())
 
         # When starting the crawler reset frontier active flags
         database_handler.reset_frontier()
@@ -103,41 +103,17 @@ class CrawlerProcess:
 
             # TODO: check for spider traps (limit amount of pages from a single site, limit the length of an url)
 
+        self.quit()
+
     def crawl(self):
-        print("CURRENT URL", self.current_page["url"])
+        print("[CRAWLING PAGE]", self.current_page["url"])
 
         domain = self.get_domain_url(self.current_page["url"])
 
         self.site = database_handler.get_site(domain)
 
         if self.site is None:
-            # We need to create a new site object
-
-            robots = self.fetch_robots(domain)
-
-            sitemap = None
-
-            if robots is not None:
-                # Create robots_parser from fetched robots.txt
-                self.parse_robots(robots)
-
-                sitemaps = self.robots_parser.get_sitemaps()
-
-                if len(sitemaps) > 0:
-                    for sitemap_url in sitemaps:
-                        sitemap = self.fetch_sitemap(sitemap_url)
-
-                        if sitemap is not None:
-                            self.parse_sitemap(sitemap)
-
-            self.site = {
-                "domain": domain,
-                "robots_content": robots,
-                "sitemap_content": sitemap
-            }
-
-            # Insert the new site into database and return the id
-            self.site["id"] = database_handler.insert_site(self.site)
+            self.create_site(domain)
         else:
             if self.site["robots_content"] is not None:
                 # Create robots_parser from robots.txt saved in the database
@@ -145,10 +121,8 @@ class CrawlerProcess:
 
         self.current_page["site_id"] = self.site["id"]
 
-        self.current_page["accessed_time"] = datetime.now()
-
         if self.allowed_to_crawl_current_page(self.current_page["url"]) is False:
-            print("ROBOTS DO NOT ALLOW THIS SITE TO BE CRAWLED")
+            print("[CRAWLING] Robots do not allow this site to be crawled")
 
             self.current_page["page_type_code"] = PAGE_TYPES["disallowed"]
 
@@ -156,13 +130,16 @@ class CrawlerProcess:
 
             self.current_page["html_content"] = None
 
-            database_handler.update_page(self.current_page)
+            database_handler.remove_page_from_frontier(self.current_page)
 
             return
 
+        self.current_page["accessed_time"] = datetime.now()
+
+        # The crawler is allowed to crawl the current site, therefore we can perform a request
         page_response = self.fetch_response(self.current_page["url"])
 
-        if page_response is not None:
+        if page_response:
             # No errors while fetching the response
 
             content_type = page_response.headers['content-type']
@@ -188,10 +165,11 @@ class CrawlerProcess:
                 if len(parsed_page['images']):
                     for image_url in parsed_page['images']:
                         self.add_page_to_frontier_array(image_url)
+
             elif CONTENT_TYPES["IMG"] in content_type:
                 # We can be pretty sure that we have an image
 
-                self.current_page["page_type_code"] = PAGE_TYPES["binary"]
+                self.current_page["page_type_code"] = PAGE_TYPES["image"]
 
                 self.current_page["html_content"] = None
 
@@ -206,6 +184,7 @@ class CrawlerProcess:
                 }
 
                 self.insert_image_data(image_data)
+
             else:
                 # The crawler detected a non-image binary file
 
@@ -221,7 +200,9 @@ class CrawlerProcess:
                         data_type_code = code
 
                 if data_type_code is None:
-                    print("Page response content-type is not in CONTENT_TYPES: ", content_type)
+                    # The content type is not in the allowed values, therefore we can ignore it
+
+                    print("[CRAWLING] Page response content-type is not in CONTENT_TYPES: ", content_type)
                 else:
                     page_data = {
                         "page_id": self.current_page["id"],
@@ -230,6 +211,7 @@ class CrawlerProcess:
                     }
 
                     self.insert_page_data(page_data)
+
         else:
             # An error occurred while fetching page (SSL certificate error, timeout, etc.)
 
@@ -240,16 +222,16 @@ class CrawlerProcess:
             self.current_page["html_content"] = None
 
         # Update the page in the database, remove FRONTIER type and replace it with the correct one
-        database_handler.update_page(self.current_page)
+        database_handler.remove_page_from_frontier(self.current_page)
 
         self.add_pages_to_frontier()
 
+    """
+        Fetch a response from the url, so that we get the status code and find out if any errors occur while fetching
+        (some sites for example require a certificate to connect, some sites timeout, etc.)
+    """
     def fetch_response(self, url):
-        response = None
-
         try:
-            # some sites require a certificate to access, which throws an error
-
             response = requests.get(url)
 
             return response
@@ -258,22 +240,60 @@ class CrawlerProcess:
 
             return None
 
-    def fetch_head(self, url):
-        response = requests.head(url)
+    """
+        Create a new site object and insert it into the database
+    """
+    def create_site(self, domain):
+        # We need to create a new site object
 
-        return response
+        robots = self.fetch_robots(domain)
 
+        sitemap = None
+
+        if robots is not None:
+            # Create robots_parser from fetched robots.txt
+            self.parse_robots(robots)
+
+            sitemaps = self.robots_parser.get_sitemaps()
+
+            if len(sitemaps) > 0:
+                for sitemap_url in sitemaps:
+                    sitemap = self.fetch_sitemap(sitemap_url)
+
+                    if sitemap is not None:
+                        self.parse_sitemap(sitemap)
+
+        self.site = {
+            "domain": domain,
+            "robots_content": robots,
+            "sitemap_content": sitemap
+        }
+
+        # Insert the new site into database and return the id
+        self.site["id"] = database_handler.insert_site(self.site)
+
+    """
+        Fetch and render the site in the chrome driver then return the resulting html so that it can be saved in the 
+        current page html_content
+    """
     def fetch_rendered_page_source(self, url):
         self.driver.get(url)
 
         return self.driver.page_source
 
+    """
+        Get the domain name of the current site so that we can check if the site is already in the database or if we
+        have to create it
+    """
     def get_domain_url(self, url):
         parsed_uri = urlparse(url)
 
         return '{uri.scheme}://{uri.netloc}/'.format(uri=parsed_uri)
 
-    # https://stackoverflow.com/questions/10552188/python-split-url-to-find-image-name-and-extension
+    """
+        Get the filename from an online image resource
+        https://stackoverflow.com/questions/10552188/python-split-url-to-find-image-name-and-extension
+    """
     def get_image_filename(self, image_url):
         filename = image_url.split('/')[-1]
 
@@ -282,8 +302,8 @@ class CrawlerProcess:
     def fetch_robots(self, domain):
         response = self.fetch_response(domain + "/robots.txt")
 
-        # We need to check fi the returned file is actually a txt file, because some sites route back to the index page
-        if response and response.status_code is 200 and CONTENT_TYPES["TXT"] in response.headers['content-type']:
+        # We need to check if the returned file is actually a txt file, because some sites route back to the index page
+        if response and response.status_code is 200 and "text/plain" in response.headers['content-type']:
             return response.text
 
         return None
@@ -316,6 +336,9 @@ class CrawlerProcess:
 
         sitemap_tags = soup.find_all("loc")
 
+        if sitemap_tags is None:
+            return
+
         for sitemap_tag in sitemap_tags:
             url = self.get_parsed_url(sitemap_tag.text)
 
@@ -323,7 +346,7 @@ class CrawlerProcess:
                 self.add_page_to_frontier_array(url)
 
     """
-        Checks if robots are set and if they allow the crawling of the current site
+        Checks if robots are set for the current site and if they allow the crawling of the current page
     """
     def allowed_to_crawl_current_page(self, url):
         if self.robots_parser is not None:
@@ -332,7 +355,8 @@ class CrawlerProcess:
         return True
 
     """
-        Using the chrome driver to fetch all links and image sources, because the driver already returns absolute urls
+        Use the chrome driver to fetch all links and image sources in the rendered page (the driver already returns 
+        absolute urls)
     """
     def parse_page(self, html_content):
         browser = self.driver
@@ -376,6 +400,9 @@ class CrawlerProcess:
             "images": images
         }
 
+    """
+        Find all the hrefs that are set in javascript code (window.location changes)
+    """
     def parse_links_from_javacript(self, javascript_text):
         links = re.findall(r'(http://|https://)([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?',
                            javascript_text)
@@ -387,12 +414,14 @@ class CrawlerProcess:
 
         return links
 
-    # Create a parsed url (ignore javascript, fix relative urls etc)
+    """
+        Create a parsed url (ignore javascript and html actions, remove hashes, fix relative urls etc.)
+    """
     def get_parsed_url(self, url):
         if url is None or url is "":
             return None
 
-        current_url = self.current_page["url"]
+        domain = self.site["domain"]
 
         if 'http' not in url:
             # Since the chrome driver returns absolute urls, the url is most likely javascript or action
@@ -416,29 +445,32 @@ class CrawlerProcess:
             """
                 Fix relative urls just in case
                 
-                This block is not really implemented correctly, since the relative url is appended to the current url,
-                which is not the root url in most cases
+                This function might not work correctly since it's almost impossible to know which root url the link 
+                takes when it's added to the site
             """
             if url[0] == "/":
-                if current_url[-1] == "/":
+                if domain[-1] == "/":
                     # Make sure only one slash is present
                     url = url[1:]
             else:
-                if current_url[-1] != "/":
+                if domain[-1] != "/":
                     url = "/{}".format(url)
 
-            # Create an absolute url
-            url = "{}{}".format(current_url, url).strip()
+            # TODO: read up on anchor tags and how they determine the root domain for relative tags
+            url = "{}{}".format(domain, url).strip()
 
         # Remove everything after the hash
         if "#" in url:
             url = url.split("#")[0]
 
-        # Encode special characters (https://docs.python.org/2/library/urllib.html#urllib.quote)
+        # Encode special characters (the second parameter are characters that the encoder will not encode)
         url = quote(url.encode("UTF-8"), ':/-_.~&?+=')
 
         return url
 
+    """
+        Parse image urls
+    """
     def get_parsed_image_url(self, url):
         if url is None or url is "":
             return None
@@ -446,6 +478,28 @@ class CrawlerProcess:
         # Do not parse base64 images
         if "data:image" in url:
             return None
+
+        if 'http' not in url:
+            # This is very unlikely, since the chrome driver returns all the image sources with absolute urls
+
+            domain = self.site["domain"]
+
+            """
+                Fix relative urls just in case
+
+                This function might not work correctly since it's almost impossible to know which root url the link 
+                takes when it's added to the site
+            """
+            if url[0] == "/":
+                if domain[-1] == "/":
+                    # Make sure only one slash is present
+                    url = url[1:]
+            else:
+                if domain[-1] != "/":
+                    url = "/{}".format(url)
+
+            # Create an absolute url
+            url = "{}{}".format(domain, url).strip()
 
         return url
 
@@ -463,7 +517,7 @@ class CrawlerProcess:
             # Only add pages in the allowed domain
             self.pages_to_add_to_frontier.append({
                 "from": self.current_page["id"],
-                "to": page_url,
+                "to": page_url
             })
 
     def get_page_from_frontier(self):

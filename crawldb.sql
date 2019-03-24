@@ -94,6 +94,7 @@ INSERT INTO crawldb.data_type VALUES
 INSERT INTO crawldb.page_type VALUES 
 	('HTML'),
 	('BINARY'),
+	('IMAGE'),
 	('DUPLICATE'),
 	('FRONTIER'),
 	('DISALLOWED'),

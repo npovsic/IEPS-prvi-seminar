@@ -4,6 +4,7 @@ from psycopg2 import pool
 from config import config
 from datetime import datetime
 
+
 class DatabaseHandler:
     def __init__(self, minimum_connections, max_connections):
         # Set a lock object, so that only one connection to the database is allowed
@@ -25,35 +26,10 @@ class DatabaseHandler:
             )
 
             if self.connection_pool:
-                print('Connection to database created succesfully')
+                print('[DATABASE] Connection successfully established')
 
         except (Exception, psycopg2.DatabaseError) as error:
-            print("ERROR IN DATABASE", error)
-
-    def insert_seed_page(self, seed_page):
-        connection = None
-
-        try:
-            connection = self.connection_pool.getconn()
-
-            cursor = connection.cursor()
-
-            cursor.execute(
-                """
-                    INSERT INTO crawldb.page("url", "page_type_code") 
-                    VALUES(%s, %s);
-                """,
-                (seed_page, "FRONTIER")
-            )
-
-            connection.commit()
-
-            cursor.close()
-        except (Exception, psycopg2.DatabaseError) as error:
-            print("ERROR IN DATABASE", error)
-        finally:
-            if connection:
-                self.connection_pool.putconn(connection)
+            print("[ERROR WHILE ESTABLISHING CONNECTION TO DATABASE]", error)
 
     """
         This function uses the lock so that no two crawler processes get the same frontier url
@@ -90,7 +66,7 @@ class DatabaseHandler:
                     """
                         UPDATE crawldb.page 
                         SET active_in_frontier=TRUE 
-                        WHERE id=%s
+                        WHERE id=%s;
                     """,
                     (frontier[0],)
                 )
@@ -102,14 +78,17 @@ class DatabaseHandler:
                 return {
                     'id': frontier[0],
                     'url': frontier[3],
-                    'added': frontier[7],
+                    'added': frontier[7]
                 }
             except (Exception, psycopg2.DatabaseError) as error:
-                print("ERROR IN DATABASE", error)
+                print("[ERROR WHILE FETCHING PAGE FROM FRONTIER]", error)
             finally:
                 if connection:
                     self.connection_pool.putconn(connection)
 
+    """
+        Create a new entry in the links table
+    """
     def link_pages(self, from_page, to_page):
         connection = None
 
@@ -121,7 +100,7 @@ class DatabaseHandler:
             cursor.execute(
                 """
                     INSERT INTO crawldb.link("from_page", "to_page") 
-                    VALUES(%s, %s)
+                    VALUES(%s, %s);
                 """,
                 (from_page, to_page)
             )
@@ -130,11 +109,42 @@ class DatabaseHandler:
 
             cursor.close()
         except (Exception, psycopg2.DatabaseError) as error:
-            print("ERROR IN DATABASE", error)
+            print("[ERROR WHILE LINKING PAGES]", error)
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
 
+    """
+        Add a single page to the frontier
+    """
+    def add_page_to_frontier(self, seed_page):
+        connection = None
+
+        try:
+            connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    INSERT INTO crawldb.page("url", "page_type_code") 
+                    VALUES(%s, %s);
+                """,
+                (seed_page, "FRONTIER")
+            )
+
+            connection.commit()
+
+            cursor.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("[ERROR WHILE ADDING PAGE TO FRONTIER]", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
+
+    """
+        Add multiple pages to the frontier
+    """
     def add_pages_to_frontier(self, pages_to_add):
         with self.lock:
             connection = None
@@ -164,24 +174,27 @@ class DatabaseHandler:
                         cursor.close()
 
                     except psycopg2.IntegrityError:
-                        # Do not print duplicate key errors
+                        # Do not print duplicate key errors (integrity error is thrown when inserting a duplicate url)
 
                         self.connection_pool.putconn(connection)
 
                         connection = self.connection_pool.getconn()
                     except (Exception, psycopg2.DatabaseError) as error:
-                        print("ERROR IN DATABASE", error)
+                        print("[ERROR WHILE ADDING PAGES TO FRONTIER]", error)
 
                         self.connection_pool.putconn(connection)
 
                         connection = self.connection_pool.getconn()
             except (Exception, psycopg2.DatabaseError) as error:
-                print("ERROR IN DATABASE", error)
+                print("[ERROR WHILE ADDING PAGES TO FRONTIER]", error)
             finally:
                 if connection:
                     self.connection_pool.putconn(connection)
 
-    def update_page(self, current_page):
+    """
+        Remove the page from the frontier and populate all the necessary data
+    """
+    def remove_page_from_frontier(self, current_page):
         with self.lock:
             connection = None
 
@@ -195,7 +208,7 @@ class DatabaseHandler:
                         UPDATE crawldb.page 
                         SET site_id=%s, page_type_code=%s, html_content=%s, http_status_code=%s, 
                         accessed_time=%s, active_in_frontier=NULL 
-                        WHERE id=%s
+                        WHERE id=%s;
                     """,
                     (current_page["site_id"], current_page["page_type_code"], current_page["html_content"],
                      current_page["http_status_code"], current_page["accessed_time"], current_page["id"])
@@ -203,15 +216,16 @@ class DatabaseHandler:
 
                 connection.commit()
 
-                print("[TRANSFERRED PAGE FROM FRONTIER]", current_page["url"])
-
                 cursor.close()
             except (Exception, psycopg2.DatabaseError) as error:
-                print("ERROR IN DATABASE", error)
+                print("[ERROR WHILE REMOVING PAGE FROM FRONTIER]", error)
             finally:
                 if connection:
                     self.connection_pool.putconn(connection)
 
+    """
+        Find a site in the database by the domain name and return it if it exists
+    """
     def get_site(self, domain):
         connection = None
 
@@ -222,7 +236,7 @@ class DatabaseHandler:
 
             cursor.execute(
                 """
-                    SELECT * FROM crawldb.site WHERE domain=%s
+                    SELECT * FROM crawldb.site WHERE domain=%s;
                 """,
                 (domain,)
             )
@@ -241,11 +255,14 @@ class DatabaseHandler:
                 "robots_content": site[2]
             }
         except (Exception, psycopg2.DatabaseError) as error:
-            print("ERROR IN DATABASE", error)
+            print("[ERROR WHILE FETCHING SITE]", error)
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
 
+    """
+        Create a new site if it doesn't exist and return its id
+    """
     def insert_site(self, site):
         connection = None
 
@@ -270,11 +287,14 @@ class DatabaseHandler:
 
             return id
         except (Exception, psycopg2.DatabaseError) as error:
-            print("ERROR IN DATABASE", error)
+            print("[ERROR WHILE INSERTING SITE]", error)
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
 
+    """
+        Insert binary non-image page data
+    """
     def insert_page_data(self, page_data):
         connection = None
 
@@ -295,11 +315,14 @@ class DatabaseHandler:
 
             cursor.close()
         except (Exception, psycopg2.DatabaseError) as error:
-            print("ERROR IN DATABASE", error)
+            print("[ERROR WHILE INSERTING PAGE DATA]", error)
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
 
+    """
+        Insert the image that the crawler fetched
+    """
     def insert_image_data(self, image_data):
         connection = None
 
@@ -321,11 +344,15 @@ class DatabaseHandler:
 
             cursor.close()
         except (Exception, psycopg2.DatabaseError) as error:
-            print("ERROR IN DATABASE", error)
+            print("[ERROR WHILE INSERTING IMAGE DATA]", error)
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
 
+    """
+        The crawler might have been shut down prematurely and some pages may have the active_in_frontier flag still set
+        This function simply resets all active_in_frontier flags
+    """
     def reset_frontier(self):
         connection = None
 
@@ -338,7 +365,7 @@ class DatabaseHandler:
                 """
                     UPDATE crawldb.page 
                     SET active_in_frontier=NULL 
-                    WHERE page_type_code = 'FRONTIER'
+                    WHERE page_type_code = 'FRONTIER';
                 """
             )
 
@@ -346,11 +373,14 @@ class DatabaseHandler:
 
             cursor.close()
         except (Exception, psycopg2.DatabaseError) as error:
-            print("ERROR IN DATABASE", error)
+            print("[ERROR WHILE RESETTING FRONTIER]", error)
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
 
+    """
+        Used for debugging only, as the name suggests it RESETS THE DATABASE TO ITS INITIAL STATE
+    """
     def reset_database(self):
         connection = None
 
@@ -408,7 +438,7 @@ class DatabaseHandler:
 
             cursor.close()
         except (Exception, psycopg2.DatabaseError) as error:
-            print("ERROR IN DATABASE", error)
+            print("[ERROR WHILE RESETTING DATABASE]", error)
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
