@@ -258,6 +258,37 @@ class DatabaseHandler:
                 self.connection_pool.putconn(connection)
 
     """
+        Find a page in the database by the hash_content and return it if it exists
+    """
+
+    def find_page_duplicate(self, hash_content):
+        connection = None
+
+        try:
+            connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    SELECT * FROM crawldb.page WHERE hash_content=%s;
+                """,
+                (hash_content,)
+            )
+
+            connection.commit()
+
+            page = cursor.fetchone()
+
+            return page is not None
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("[ERROR WHILE CHECKING PAGE DUPLICATE]", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
+
+    """
         Find a site in the database by the domain name and return it if it exists
     """
     def get_site(self, domain):
@@ -386,6 +417,7 @@ class DatabaseHandler:
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
+
 
     """
         The crawler might have been shut down prematurely and some pages may have the active_in_crawler flag still set
