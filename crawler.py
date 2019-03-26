@@ -1,4 +1,4 @@
-from multiprocessing import Process
+from multiprocessing import Process, current_process
 import requests
 from selenium import webdriver
 from bs4 import BeautifulSoup
@@ -7,6 +7,7 @@ from datetime import datetime
 from robotparser import RobotFileParser
 from database_handler import DatabaseHandler
 import re
+import time
 
 # Create a global database handler for all processes to share
 database_handler = DatabaseHandler(0, 100)
@@ -51,16 +52,20 @@ class Crawler:
 
     def run(self):
         for i in range(self.number_of_processes):
-            p = Process(target=self.create_process)
+            p = Process(target=self.create_process, args=[i])
             p.start()
 
-    def create_process(self):
-        crawler_process = CrawlerProcess()
+    def create_process(self, index):
+        crawler_process = CrawlerProcess(index)
 
 
 class CrawlerProcess:
-    def __init__(self):
-        print("[CREATED CRAWLER PROCESS]")
+    def __init__(self, index):
+        self.current_process_id = index
+
+        number_of_retries = 0
+
+        print("[CREATED CRAWLER PROCESS]", self.current_process_id)
 
         # Create the chrome driver with which we will fetch and parse sites
         chrome_options = webdriver.ChromeOptions()
@@ -105,8 +110,10 @@ class CrawlerProcess:
 
         self.quit()
 
+        print("[STOPPED CRAWLER PROCESS] Frontier is empty", self.current_process_id)
+
     def crawl(self):
-        print(" [CRAWLING PAGE]", self.current_page["url"])
+        print(" {} - [CRAWLING PAGE]".format(self.current_process_id), self.current_page["url"])
 
         domain = self.get_domain_url(self.current_page["url"])
 
@@ -121,6 +128,8 @@ class CrawlerProcess:
 
         self.current_page["site_id"] = self.site["id"]
 
+        self.current_page["accessed_time"] = datetime.now()
+
         if self.allowed_to_crawl_current_page(self.current_page["url"]) is False:
             print("     [CRAWLING] Robots do not allow this site to be crawled")
 
@@ -133,8 +142,6 @@ class CrawlerProcess:
             database_handler.remove_page_from_frontier(self.current_page)
 
             return
-
-        self.current_page["accessed_time"] = datetime.now()
 
         # The crawler is allowed to crawl the current site, therefore we can perform a request
         page_response = self.fetch_response(self.current_page["url"])
@@ -254,28 +261,29 @@ class CrawlerProcess:
     def create_site(self, domain):
         # We need to create a new site object
 
-        robots = self.fetch_robots(domain)
+        self.site = {
+            "domain": domain
+        }
 
-        sitemap = None
+        robots_content = self.fetch_robots(domain)
 
-        if robots is not None:
+        sitemap_content = None
+
+        if robots_content is not None:
             # Create robots_parser from fetched robots.txt
-            self.parse_robots(robots)
+            self.parse_robots(robots_content)
 
             sitemaps = self.robots_parser.get_sitemaps()
 
             if len(sitemaps) > 0:
                 for sitemap_url in sitemaps:
-                    sitemap = self.fetch_sitemap(sitemap_url)
+                    sitemap_content = self.fetch_sitemap(sitemap_url)
 
-                    if sitemap is not None:
-                        self.parse_sitemap(sitemap)
+                    if sitemap_content is not None:
+                        self.parse_sitemap(sitemap_content)
 
-        self.site = {
-            "domain": domain,
-            "robots_content": robots,
-            "sitemap_content": sitemap
-        }
+        self.site["robots_content"] = robots_content
+        self.site["sitemap_content"] = sitemap_content
 
         # Insert the new site into database and return the id
         self.site["id"] = database_handler.insert_site(self.site)

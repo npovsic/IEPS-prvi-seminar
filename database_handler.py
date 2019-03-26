@@ -48,8 +48,8 @@ class DatabaseHandler:
                 cursor.execute(
                     """
                         SELECT * FROM crawldb.page 
-                        WHERE page_type_code='FRONTIER' AND active_in_frontier IS NULL
-                        ORDER BY added_to_frontier
+                        WHERE page_type_code='FRONTIER' AND active_in_crawler IS NULL
+                        ORDER BY added_at_time
                     """
                 )
 
@@ -65,7 +65,7 @@ class DatabaseHandler:
                 cursor.execute(
                     """
                         UPDATE crawldb.page 
-                        SET active_in_frontier=TRUE 
+                        SET active_in_crawler=TRUE 
                         WHERE id=%s;
                     """,
                     (frontier[0],)
@@ -77,8 +77,7 @@ class DatabaseHandler:
 
                 return {
                     'id': frontier[0],
-                    'url': frontier[3],
-                    'added': frontier[7]
+                    'url': frontier[3]
                 }
             except (Exception, psycopg2.DatabaseError) as error:
                 print("[ERROR WHILE FETCHING PAGE FROM FRONTIER]", error)
@@ -158,7 +157,7 @@ class DatabaseHandler:
 
                         cursor.execute(
                             """
-                                INSERT INTO crawldb.page("url", "page_type_code", "added_to_frontier") 
+                                INSERT INTO crawldb.page("url", "page_type_code", "added_at_time") 
                                 VALUES(%s, %s, %s)
                                 RETURNING id;
                             """,
@@ -207,7 +206,7 @@ class DatabaseHandler:
                     """
                         UPDATE crawldb.page 
                         SET site_id=%s, page_type_code=%s, html_content=%s, http_status_code=%s, 
-                        accessed_time=%s, active_in_frontier=NULL 
+                        accessed_time=%s, active_in_crawler=NULL 
                         WHERE id=%s;
                     """,
                     (current_page["site_id"], current_page["page_type_code"], current_page["html_content"],
@@ -252,6 +251,7 @@ class DatabaseHandler:
 
             return {
                 "id": site[0],
+                "domain": site[1],
                 "robots_content": site[2]
             }
         except (Exception, psycopg2.DatabaseError) as error:
@@ -282,6 +282,9 @@ class DatabaseHandler:
             connection.commit()
 
             id = cursor.fetchone()[0]
+
+            if id is None:
+                print("[ERROR WHILE INSERTING SITE] Inserted site was not found")
 
             cursor.close()
 
@@ -350,8 +353,8 @@ class DatabaseHandler:
                 self.connection_pool.putconn(connection)
 
     """
-        The crawler might have been shut down prematurely and some pages may have the active_in_frontier flag still set
-        This function simply resets all active_in_frontier flags
+        The crawler might have been shut down prematurely and some pages may have the active_in_crawler flag still set
+        This function simply resets all active_in_crawler flags
     """
     def reset_frontier(self):
         connection = None
@@ -364,7 +367,7 @@ class DatabaseHandler:
             cursor.execute(
                 """
                     UPDATE crawldb.page 
-                    SET active_in_frontier=NULL 
+                    SET active_in_crawler=NULL 
                     WHERE page_type_code = 'FRONTIER';
                 """
             )
