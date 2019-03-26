@@ -34,6 +34,7 @@ class DatabaseHandler:
     """
         This function uses the lock so that no two crawler processes get the same frontier url
     """
+    # TODO: Lock is obviously not working correctly
     def get_page_from_frontier(self):
         with self.lock:
             connection = None

@@ -37,6 +37,12 @@ PAGE_TYPES = {
 # Only scrape sites in the gov.si domain
 ALLOWED_DOMAIN = ".gov.si"
 
+# The maximum number of retries for a crawler process if the frontier is empty
+MAX_NUMBER_OF_RETRIES = 5
+
+# Delay for retrying to fetch a page from the frontier
+DELAY = 10
+
 
 class Crawler:
     def __init__(self, number_of_processes):
@@ -92,9 +98,22 @@ class CrawlerProcess:
         """
         self.current_page = database_handler.get_page_from_frontier()
 
-        # TODO: this is perhaps not a sufficient condition, because the frontier may yet be populated by another process
-        while self.current_page:
-            self.crawl()
+        """
+            If a page was fetched from the frontier the crawler can continue, otherwise try again in DELAY seconds
+            
+            If the frontier is still empty after MAX_NUMBER_OF_RETRIES was reached, we can assume that the frontier is
+            really empty and no crawler process is going to insert new pages
+        """
+        while self.current_page or number_of_retries < MAX_NUMBER_OF_RETRIES:
+            if self.current_page:
+                number_of_retries = 0
+
+                self.crawl()
+            else:
+                # No page was fetched from the frontier, try again in DELAY seconds
+                number_of_retries += 1
+
+                time.sleep(DELAY)
 
             # Reset all variables after a page was successfully transferred from the frontier
 
@@ -110,7 +129,7 @@ class CrawlerProcess:
 
         self.quit()
 
-        print("[STOPPED CRAWLER PROCESS] Frontier is empty", self.current_process_id)
+        print("[STOPPED CRAWLER PROCESS] Frontier is empty after several tries", self.current_process_id)
 
     def crawl(self):
         print(" {} - [CRAWLING PAGE]".format(self.current_process_id), self.current_page["url"])
