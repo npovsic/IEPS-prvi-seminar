@@ -206,11 +206,11 @@ class DatabaseHandler:
                 cursor.execute(
                     """
                         UPDATE crawldb.page 
-                        SET site_id=%s, page_type_code=%s, html_content=%s, http_status_code=%s, 
+                        SET site_id=%s, page_type_code=%s, html_content=%s, hash_content=%s, http_status_code=%s, 
                         accessed_time=%s, active_in_crawler=NULL 
                         WHERE id=%s;
                     """,
-                    (current_page["site_id"], current_page["page_type_code"], current_page["html_content"],
+                    (current_page["site_id"], current_page["page_type_code"], current_page["html_content"], current_page["hash_content"],
                      current_page["http_status_code"], current_page["accessed_time"], current_page["id"])
                 )
 
@@ -222,6 +222,37 @@ class DatabaseHandler:
             finally:
                 if connection:
                     self.connection_pool.putconn(connection)
+
+    """
+        Find a page in the database by the hash_content and return it if it exists
+    """
+
+    def find_page_duplicate(self, hash_content):
+        connection = None
+
+        try:
+            connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    SELECT * FROM crawldb.page WHERE hash_content=%s;
+                """,
+                (hash_content,)
+            )
+
+            connection.commit()
+
+            page = cursor.fetchone()
+
+            return page is not None
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("[ERROR WHILE CHECKING PAGE DUPLICATE]", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
 
     """
         Find a site in the database by the domain name and return it if it exists
@@ -352,6 +383,7 @@ class DatabaseHandler:
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
+
 
     """
         The crawler might have been shut down prematurely and some pages may have the active_in_crawler flag still set

@@ -8,6 +8,7 @@ from robotparser import RobotFileParser
 from database_handler import DatabaseHandler
 import re
 import time
+import hashlib
 
 # Create a global database handler for all processes to share
 database_handler = DatabaseHandler(0, 100)
@@ -178,13 +179,19 @@ class CrawlerProcess:
                 html_content = self.fetch_rendered_page_source(self.current_page["url"])
 
                 if self.is_duplicate_page(html_content):
+                    print("     [CRAWLING] Found page duplicate, that has already been parsed: ", self.current_page["url"])
+
                     self.current_page["page_type_code"] = PAGE_TYPES["duplicate"]
 
                     self.current_page["html_content"] = None
+
+                    self.current_page["hash_content"] = None
                 else:
                     self.current_page["page_type_code"] = PAGE_TYPES["html"]
 
                     self.current_page["html_content"] = html_content
+
+                    self.current_page["hash_content"] = self.create_content_hash(html_content)
 
                     parsed_page = self.parse_page(self.current_page["html_content"])
 
@@ -538,6 +545,13 @@ class CrawlerProcess:
 
         return url
 
+    def create_content_hash(self, html_content):
+        m = hashlib.sha256()
+
+        m.update(html_content.encode('utf-8'))
+
+        return m.hexdigest()
+
     """
         TODO: use a hash algorithm that return a similar value for similar pages
         The duplicate page should not have the html_content value set, page_type_code should be DUPLICATE and
@@ -545,9 +559,9 @@ class CrawlerProcess:
     """
     # TODO: check for duplicates
     def is_duplicate_page(self, html_content):
-        print("Check duplicated")
+        h = self.create_content_hash(html_content)
 
-        return False
+        return database_handler.find_page_duplicate(h)
 
     def add_page_to_frontier_array(self, page_url):
         if ALLOWED_DOMAIN in page_url:

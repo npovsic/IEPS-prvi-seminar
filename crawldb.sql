@@ -29,6 +29,7 @@ CREATE TABLE crawldb.page
   page_type_code    varchar(20),
   url               varchar(3000),
   html_content      text,
+  hash_content      text,
   http_status_code  integer,
   accessed_time     timestamp,
   added_at_time     timestamp,
