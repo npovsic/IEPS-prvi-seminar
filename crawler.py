@@ -149,22 +149,29 @@ class CrawlerProcess:
             if CONTENT_TYPES["HTML"] in content_type:
                 # We got an HTML page
 
-                self.current_page["page_type_code"] = PAGE_TYPES["html"]
+                html_content = self.fetch_rendered_page_source(self.current_page["url"])
 
-                self.current_page["html_content"] = self.fetch_rendered_page_source(self.current_page["url"])
+                if self.is_duplicate_page(html_content):
+                    self.current_page["page_type_code"] = PAGE_TYPES["duplicate"]
 
-                self.check_for_duplication(self.current_page["html_content"])
+                    self.current_page["html_content"] = None
+                else:
+                    self.current_page["page_type_code"] = PAGE_TYPES["html"]
 
-                parsed_page = self.parse_page(self.current_page["html_content"])
+                    self.current_page["html_content"] = html_content
 
-                if len(parsed_page['links']):
-                    for link in parsed_page['links']:
+                    self.check_for_duplication(self.current_page["html_content"])
 
-                        self.add_page_to_frontier_array(link)
+                    parsed_page = self.parse_page(self.current_page["html_content"])
 
-                if len(parsed_page['images']):
-                    for image_url in parsed_page['images']:
-                        self.add_page_to_frontier_array(image_url)
+                    if len(parsed_page['links']):
+                        for link in parsed_page['links']:
+
+                            self.add_page_to_frontier_array(link)
+
+                    if len(parsed_page['images']):
+                        for image_url in parsed_page['images']:
+                            self.add_page_to_frontier_array(image_url)
 
             elif CONTENT_TYPES["IMG"] in content_type:
                 # We can be pretty sure that we have an image
@@ -512,8 +519,10 @@ class CrawlerProcess:
          that's it
     """
     # TODO: check for duplicates
-    def check_for_duplication(self, html_content):
+    def is_duplicate_page(self, html_content):
         print("Check duplicated")
+
+        return False
 
     def add_page_to_frontier_array(self, page_url):
         if ALLOWED_DOMAIN in page_url:
