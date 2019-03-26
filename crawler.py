@@ -160,8 +160,6 @@ class CrawlerProcess:
 
                     self.current_page["html_content"] = html_content
 
-                    self.check_for_duplication(self.current_page["html_content"])
-
                     parsed_page = self.parse_page(self.current_page["html_content"])
 
                     if len(parsed_page['links']):
