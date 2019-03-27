@@ -117,6 +117,8 @@ class CrawlerProcess:
                 # No page was fetched from the frontier, try again in DELAY seconds
                 number_of_retries += 1
 
+                print("[CRAWLER PROCESS] Frontier is empty, retrying in 10 seconds", self.current_process_id)
+
                 time.sleep(DELAY)
 
             # Reset all variables after a page was successfully transferred from the frontier
@@ -260,7 +262,7 @@ class CrawlerProcess:
         database_handler.remove_page_from_frontier(self.current_page)
 
         # Add all the links from the page and sitemap to the frontier
-        database_handler.add_pages_to_frontier(self.lock, self.pages_to_add_to_frontier)
+        database_handler.add_pages_to_frontier(self.pages_to_add_to_frontier)
 
         print(" {} - [CRAWLING] Finished crawling".format(self.current_process_id))
 
@@ -397,48 +399,60 @@ class CrawlerProcess:
     """
         Use the chrome driver to fetch all links and image sources in the rendered page (the driver already returns 
         absolute urls)
+        
+        Note: Sometimes throws StaleElementReferenceException, need to check what that's about. The exception itself 
+        just means that the desired element is no longer rendered in DOM. Maybe the memory was getting low, since I got the
+        error when I was running 10 crawler processes.
     """
     def parse_page(self, html_content):
-        browser = self.driver
-
         links = []
         images = []
 
-        anchor_tags = browser.find_elements_by_tag_name("a")
+        try:
+            browser = self.driver
 
-        for anchor_tag in anchor_tags:
-            href = anchor_tag.get_attribute("href")
+            anchor_tags = browser.find_elements_by_tag_name("a")
 
-            url = self.get_parsed_url(href)
+            for anchor_tag in anchor_tags:
+                href = anchor_tag.get_attribute("href")
 
-            if url:
-                links.append(url)
+                url = self.get_parsed_url(href)
 
-        image_tags = browser.find_elements_by_tag_name("img")
+                if url:
+                    links.append(url)
 
-        for image_tag in image_tags:
-            src = image_tag.get_attribute("src")
+            image_tags = browser.find_elements_by_tag_name("img")
 
-            if src:
-                image_url = self.get_parsed_image_url(src)
+            for image_tag in image_tags:
+                src = image_tag.get_attribute("src")
 
-                if image_url:
-                    images.append(image_url)
+                if src:
+                    image_url = self.get_parsed_image_url(src)
 
-        soup = BeautifulSoup(html_content, 'html.parser')
+                    if image_url:
+                        images.append(image_url)
 
-        script_tags = soup.findAll('script')
+            soup = BeautifulSoup(html_content, 'html.parser')
 
-        for script_tag in script_tags:
-            links_from_javascript = self.parse_links_from_javacript(script_tag.text)
+            script_tags = soup.findAll('script')
 
-            for link in links_from_javascript:
-                links.append(link)
+            for script_tag in script_tags:
+                links_from_javascript = self.parse_links_from_javacript(script_tag.text)
 
-        return {
-            "links": links,
-            "images": images
-        }
+                for link in links_from_javascript:
+                    links.append(link)
+
+            return {
+                "links": links,
+                "images": images
+            }
+        except Exception as error:
+            print("[ERROR WHILE RENDERING WITH WEB DRIVER]", error)
+
+            return {
+                "links": links,
+                "images": images
+            }
 
     """
         Find all the hrefs that are set in javascript code (window.location changes)

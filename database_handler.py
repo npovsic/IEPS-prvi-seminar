@@ -100,15 +100,30 @@ class DatabaseHandler:
 
             cursor.execute(
                 """
-                    INSERT INTO crawldb.link("from_page", "to_page") 
-                    VALUES(%s, %s);
+                    SELECT * FROM crawldb.link
+                    WHERE from_page=%s AND to_page=%s
                 """,
                 (from_page, to_page)
             )
 
-            connection.commit()
+            existing_link = cursor.fetchone()
 
             cursor.close()
+
+            if existing_link is None:
+                cursor = connection.cursor()
+
+                cursor.execute(
+                    """
+                        INSERT INTO crawldb.link("from_page", "to_page") 
+                        VALUES(%s, %s);
+                    """,
+                    (from_page, to_page)
+                )
+
+                connection.commit()
+
+                cursor.close()
         except (Exception, psycopg2.DatabaseError) as error:
             print("[ERROR WHILE LINKING PAGES]", error)
         finally:
@@ -146,9 +161,7 @@ class DatabaseHandler:
     """
         Add multiple pages to the frontier
     """
-    def add_pages_to_frontier(self, lock, pages_to_add):
-        lock.acquire()
-
+    def add_pages_to_frontier(self, pages_to_add):
         connection = None
 
         try:
@@ -160,22 +173,39 @@ class DatabaseHandler:
 
                     cursor.execute(
                         """
-                            INSERT INTO crawldb.page("url", "page_type_code", "added_at_time") 
-                            VALUES(%s, %s, %s)
-                            RETURNING id;
+                            SELECT * FROM crawldb.page 
+                            WHERE url=%s
                         """,
-                        (page["to"], "FRONTIER", datetime.now())
+                        (page["to"],)
                     )
 
-                    connection.commit()
-
-                    to_page = cursor.fetchone()[0]
-
-                    self.link_pages(page["from"], to_page)
+                    # Check if the page already exists
+                    to_page = cursor.fetchone()
 
                     cursor.close()
 
+                    if to_page is None:
+                        cursor = connection.cursor()
+
+                        cursor.execute(
+                            """
+                                INSERT INTO crawldb.page("url", "page_type_code", "added_at_time") 
+                                VALUES(%s, %s, %s)
+                                RETURNING id;
+                            """,
+                            (page["to"], "FRONTIER", datetime.now())
+                        )
+
+                        connection.commit()
+
+                        to_page = cursor.fetchone()
+
+                        cursor.close()
+
+                    self.link_pages(page["from"], to_page[0])
                 except psycopg2.IntegrityError:
+                    print("[ERROR WHILE ADDING PAGES TO FRONTIER] Integrity error, adding a duplicate url")
+
                     # Do not print duplicate key errors (integrity error is thrown when inserting a duplicate url)
 
                     self.connection_pool.putconn(connection)
@@ -192,8 +222,6 @@ class DatabaseHandler:
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
-
-            lock.release()
 
     """
         Remove the page from the frontier and populate all the necessary data
