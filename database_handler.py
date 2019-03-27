@@ -1,4 +1,3 @@
-from multiprocessing import Lock
 import psycopg2
 from psycopg2 import pool
 from config import config
@@ -8,7 +7,6 @@ from datetime import datetime
 class DatabaseHandler:
     def __init__(self, minimum_connections, max_connections):
         # Set a lock object, so that only one connection to the database is allowed
-        self.lock = Lock()
 
         self.connection_pool = None
 
@@ -34,57 +32,60 @@ class DatabaseHandler:
     """
         This function uses the lock so that no two crawler processes get the same frontier url
     """
-    # TODO: Lock is obviously not working correctly
-    def get_page_from_frontier(self):
-        with self.lock:
-            connection = None
+    def get_page_from_frontier(self, lock):
+        lock.acquire()
 
-            try:
-                connection = self.connection_pool.getconn()
+        connection = None
 
-                # create a cursor
-                cursor = connection.cursor()
+        try:
+            connection = self.connection_pool.getconn()
 
-                # execute a statement
-                cursor.execute(
-                    """
-                        SELECT * FROM crawldb.page 
-                        WHERE page_type_code='FRONTIER' AND active_in_crawler IS NULL
-                        ORDER BY added_at_time
-                    """
-                )
+            # create a cursor
+            cursor = connection.cursor()
 
-                frontier = cursor.fetchone()
+            # execute a statement
+            cursor.execute(
+                """
+                    SELECT * FROM crawldb.page 
+                    WHERE page_type_code='FRONTIER' AND active_in_crawler IS NULL
+                    ORDER BY added_at_time
+                    LIMIT 1
+                """
+            )
 
-                if frontier is None:
-                    return
+            frontier = cursor.fetchone()
 
-                cursor.close()
+            if frontier is None:
+                return
 
-                cursor = connection.cursor()
+            cursor.close()
 
-                cursor.execute(
-                    """
-                        UPDATE crawldb.page 
-                        SET active_in_crawler=TRUE 
-                        WHERE id=%s;
-                    """,
-                    (frontier[0],)
-                )
+            cursor = connection.cursor()
 
-                connection.commit()
+            cursor.execute(
+                """
+                    UPDATE crawldb.page 
+                    SET active_in_crawler=TRUE 
+                    WHERE id=%s;
+                """,
+                (frontier[0],)
+            )
 
-                cursor.close()
+            connection.commit()
 
-                return {
-                    'id': frontier[0],
-                    'url': frontier[3]
-                }
-            except (Exception, psycopg2.DatabaseError) as error:
-                print("[ERROR WHILE FETCHING PAGE FROM FRONTIER]", error)
-            finally:
-                if connection:
-                    self.connection_pool.putconn(connection)
+            cursor.close()
+
+            return {
+                'id': frontier[0],
+                'url': frontier[3]
+            }
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("[ERROR WHILE FETCHING PAGE FROM FRONTIER]", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
+
+            lock.release()
 
     """
         Create a new entry in the links table
@@ -145,83 +146,85 @@ class DatabaseHandler:
     """
         Add multiple pages to the frontier
     """
-    def add_pages_to_frontier(self, pages_to_add):
-        with self.lock:
-            connection = None
+    def add_pages_to_frontier(self, lock, pages_to_add):
+        lock.acquire()
 
-            try:
-                connection = self.connection_pool.getconn()
+        connection = None
 
-                for page in pages_to_add:
-                    try:
-                        cursor = connection.cursor()
+        try:
+            connection = self.connection_pool.getconn()
 
-                        cursor.execute(
-                            """
-                                INSERT INTO crawldb.page("url", "page_type_code", "added_at_time") 
-                                VALUES(%s, %s, %s)
-                                RETURNING id;
-                            """,
-                            (page["to"], "FRONTIER", datetime.now())
-                        )
+            for page in pages_to_add:
+                try:
+                    cursor = connection.cursor()
 
-                        connection.commit()
+                    cursor.execute(
+                        """
+                            INSERT INTO crawldb.page("url", "page_type_code", "added_at_time") 
+                            VALUES(%s, %s, %s)
+                            RETURNING id;
+                        """,
+                        (page["to"], "FRONTIER", datetime.now())
+                    )
 
-                        to_page = cursor.fetchone()[0]
+                    connection.commit()
 
-                        self.link_pages(page["from"], to_page)
+                    to_page = cursor.fetchone()[0]
 
-                        cursor.close()
+                    self.link_pages(page["from"], to_page)
 
-                    except psycopg2.IntegrityError:
-                        # Do not print duplicate key errors (integrity error is thrown when inserting a duplicate url)
+                    cursor.close()
 
-                        self.connection_pool.putconn(connection)
+                except psycopg2.IntegrityError:
+                    # Do not print duplicate key errors (integrity error is thrown when inserting a duplicate url)
 
-                        connection = self.connection_pool.getconn()
-                    except (Exception, psycopg2.DatabaseError) as error:
-                        print("[ERROR WHILE ADDING PAGES TO FRONTIER]", error)
-
-                        self.connection_pool.putconn(connection)
-
-                        connection = self.connection_pool.getconn()
-            except (Exception, psycopg2.DatabaseError) as error:
-                print("[ERROR WHILE ADDING PAGES TO FRONTIER]", error)
-            finally:
-                if connection:
                     self.connection_pool.putconn(connection)
+
+                    connection = self.connection_pool.getconn()
+                except (Exception, psycopg2.DatabaseError) as error:
+                    print("[ERROR WHILE ADDING PAGES TO FRONTIER]", error)
+
+                    self.connection_pool.putconn(connection)
+
+                    connection = self.connection_pool.getconn()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("[ERROR WHILE ADDING PAGES TO FRONTIER]", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
+
+            lock.release()
 
     """
         Remove the page from the frontier and populate all the necessary data
     """
     def remove_page_from_frontier(self, current_page):
-        with self.lock:
-            connection = None
+        connection = None
 
-            try:
-                connection = self.connection_pool.getconn()
+        try:
+            connection = self.connection_pool.getconn()
 
-                cursor = connection.cursor()
+            cursor = connection.cursor()
 
-                cursor.execute(
-                    """
-                        UPDATE crawldb.page 
-                        SET site_id=%s, page_type_code=%s, html_content=%s, http_status_code=%s, 
-                        accessed_time=%s, active_in_crawler=NULL 
-                        WHERE id=%s;
-                    """,
-                    (current_page["site_id"], current_page["page_type_code"], current_page["html_content"],
-                     current_page["http_status_code"], current_page["accessed_time"], current_page["id"])
-                )
+            cursor.execute(
+                """
+                    UPDATE crawldb.page 
+                    SET site_id=%s, page_type_code=%s, html_content=%s, http_status_code=%s, 
+                    accessed_time=%s, active_in_crawler=NULL 
+                    WHERE id=%s;
+                """,
+                (current_page["site_id"], current_page["page_type_code"], current_page["html_content"],
+                 current_page["http_status_code"], current_page["accessed_time"], current_page["id"])
+            )
 
-                connection.commit()
+            connection.commit()
 
-                cursor.close()
-            except (Exception, psycopg2.DatabaseError) as error:
-                print("[ERROR WHILE REMOVING PAGE FROM FRONTIER]", error)
-            finally:
-                if connection:
-                    self.connection_pool.putconn(connection)
+            cursor.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("[ERROR WHILE REMOVING PAGE FROM FRONTIER]", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
 
     """
         Find a site in the database by the domain name and return it if it exists

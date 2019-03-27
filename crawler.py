@@ -1,4 +1,4 @@
-from multiprocessing import Process, current_process
+from multiprocessing import Process, current_process, Lock
 import requests
 from selenium import webdriver
 from bs4 import BeautifulSoup
@@ -48,6 +48,8 @@ class Crawler:
     def __init__(self, number_of_processes):
         self.number_of_processes = number_of_processes
 
+        self.lock = Lock()
+
         with open("seed_pages.txt", "r") as seed_pages:
             for seed_page in seed_pages:
                 if "#" not in seed_page:
@@ -58,16 +60,18 @@ class Crawler:
 
     def run(self):
         for i in range(self.number_of_processes):
-            p = Process(target=self.create_process, args=[i])
+            p = Process(target=self.create_process, args=[i, self.lock])
             p.start()
 
-    def create_process(self, index):
-        crawler_process = CrawlerProcess(index)
+    def create_process(self, index, lock):
+        crawler_process = CrawlerProcess(index, lock)
 
 
 class CrawlerProcess:
-    def __init__(self, index):
+    def __init__(self, index, lock):
         self.current_process_id = index
+
+        self.lock = lock
 
         number_of_retries = 0
 
@@ -96,7 +100,7 @@ class CrawlerProcess:
         """
             current_page is a dictionary with an id (database id for updating) and url field
         """
-        self.current_page = database_handler.get_page_from_frontier()
+        self.current_page = database_handler.get_page_from_frontier(self.lock)
 
         """
             If a page was fetched from the frontier the crawler can continue, otherwise try again in DELAY seconds
@@ -117,7 +121,7 @@ class CrawlerProcess:
 
             # Reset all variables after a page was successfully transferred from the frontier
 
-            self.current_page = database_handler.get_page_from_frontier()
+            self.current_page = database_handler.get_page_from_frontier(self.lock)
 
             self.site = None
 
@@ -256,9 +260,10 @@ class CrawlerProcess:
         database_handler.remove_page_from_frontier(self.current_page)
 
         # Add all the links from the page and sitemap to the frontier
-        database_handler.add_pages_to_frontier(self.pages_to_add_to_frontier)
+        database_handler.add_pages_to_frontier(self.lock, self.pages_to_add_to_frontier)
 
-        print("     [CRAWLING] Finished crawling")
+        print(" {} - [CRAWLING] Finished crawling".format(self.current_process_id))
+
 
     """
         Fetch a response from the url, so that we get the status code and find out if any errors occur while fetching
