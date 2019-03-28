@@ -192,7 +192,8 @@ class CrawlerProcess:
                 html_content = self.fetch_rendered_page_source(self.current_page["url"])
 
                 if self.is_duplicate_page(html_content):
-                    print("     [CRAWLING] Found page duplicate, that has already been parsed: ", self.current_page["url"])
+                    print("     [CRAWLING] Found page duplicate, that has already been parsed: ",
+                          self.current_page["url"])
 
                     self.current_page["page_type_code"] = PAGE_TYPES["duplicate"]
 
@@ -595,6 +596,7 @@ class CrawlerProcess:
         The duplicate page should not have the html_content value set, page_type_code should be DUPLICATE and
          that's it
     """
+
     # TODO: check for duplicates using LSH method
     def is_duplicate_page(self, html_content):
         h = self.create_content_hash(html_content)
@@ -609,30 +611,28 @@ class CrawlerProcess:
     def text_to_shingle_set(self, text):
         words = text.split()
 
-        print("WORDS: ", words)
-
         # keeps word shingles
-        shinglesInDocWords = set()
+        shingles_in_doc_words = set()
 
         # keeps hashed shingles
-        shinglesInDocInts = set()
+        shingles_in_doc_ints = set()
 
         shingle = []
 
-        shingleSize = 5
+        shingle_size = 5
 
-        for index in range(len(words) - shingleSize + 1):
-            shingle = words[index:index + shingleSize]
+        for index in range(len(words) - shingle_size + 1):
+            shingle = words[index:index + shingle_size]
             shingle = ' '.join(shingle)
 
-            #Hash the shingle to a 32-bit integer
+            # Hash the shingle to a 32-bit integer
             crc = binascii.crc32(shingle.encode()) & 0xffffffff
 
-            if shingle not in shinglesInDocWords:
-                shinglesInDocWords.add(shingle)
+            if shingle not in shingles_in_doc_words:
+                shingles_in_doc_words.add(shingle)
 
-            if crc not in shinglesInDocInts:
-                shinglesInDocInts.add(crc)
+            if crc not in shingles_in_doc_ints:
+                shingles_in_doc_ints.add(crc)
 
     def add_page_to_frontier_array(self, page_url):
         if ALLOWED_DOMAIN in page_url:
