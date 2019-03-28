@@ -18,6 +18,7 @@ CREATE TABLE crawldb.site
   "domain"        varchar(500),
   robots_content  text,
   sitemap_content text,
+  last_crawled_at timestamp,
   CONSTRAINT pk_site_id PRIMARY KEY (id),
   CONSTRAINT unq_site_idx UNIQUE ("domain")
 );

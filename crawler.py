@@ -162,7 +162,7 @@ class CrawlerProcess:
         self.current_page["accessed_time"] = datetime.now()
 
         if self.allowed_to_crawl_current_page(self.current_page["url"]) is False:
-            print("     [CRAWLING] Robots do not allow this site to be crawled")
+            print("     [CRAWLING] Robots do not allow this page to be crawled: {}".format(self.current_page["url"]))
 
             self.current_page["page_type_code"] = PAGE_TYPES["disallowed"]
 

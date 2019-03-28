@@ -260,6 +260,21 @@ class DatabaseHandler:
             connection.commit()
 
             cursor.close()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    UPDATE crawldb.site 
+                    SET last_crawled_at=%s
+                    WHERE id=%s;
+                """,
+                (datetime.now(), current_page["site_id"])
+            )
+
+            connection.commit()
+
+            cursor.close()
         except (Exception, psycopg2.DatabaseError) as error:
             print("[ERROR WHILE REMOVING PAGE FROM FRONTIER]", error)
         finally:
