@@ -139,8 +139,6 @@ class CrawlerProcess:
 
             self.pages_to_add_to_frontier = []
 
-            # TODO: check for spider traps (limit amount of pages from a single site, limit the length of an url)
-
         self.quit()
 
         print("[STOPPED CRAWLER PROCESS] Frontier is empty after several tries", self.current_process_id)
@@ -393,8 +391,6 @@ class CrawlerProcess:
         
         This only works for the standard XML sitemap
     """
-
-    # TODO: error handling
     def parse_sitemap(self, sitemap_xml):
         soup = BeautifulSoup(sitemap_xml, 'lxml')
 
@@ -497,6 +493,7 @@ class CrawlerProcess:
         Create a parsed url (ignore javascript and html actions, remove hashes, fix relative urls etc.)
     """
 
+    # TODO: remove index.html index.php
     def get_parsed_url(self, url):
         if url is None or url is "":
             return None
@@ -536,7 +533,6 @@ class CrawlerProcess:
                 if domain[-1] != "/":
                     url = "/{}".format(url)
 
-            # TODO: read up on anchor tags and how they determine the root domain for relative tags
             url = "{}{}".format(domain, url).strip()
 
         # Remove everything after the hash
@@ -596,8 +592,6 @@ class CrawlerProcess:
         The duplicate page should not have the html_content value set, page_type_code should be DUPLICATE and
          that's it
     """
-
-    # TODO: check for duplicates using LSH method
     def is_duplicate_page(self, html_content):
         h = self.create_content_hash(html_content)
 

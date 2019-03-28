@@ -3,8 +3,11 @@ from psycopg2 import pool
 from config import config
 from datetime import datetime
 
-# Maximum length of url (characters)
-# https://stackoverflow.com/questions/417142/what-is-the-maximum-length-of-a-url-in-different-browsers
+
+"""
+    Maximum length of url (characters)
+    https://stackoverflow.com/questions/417142/what-is-the-maximum-length-of-a-url-in-different-browsers
+"""
 MAX_URL_LEN = 2000
 
 MAX_BINARY_TABLE_SIZE = 1024 * 1024 * 1024  # 1GB
@@ -295,37 +298,6 @@ class DatabaseHandler:
                 self.connection_pool.putconn(connection)
 
     """
-        Find a page in the database by the hash_content and return it if it exists
-    """
-
-    def find_page_duplicate(self, hash_content):
-        connection = None
-
-        try:
-            connection = self.connection_pool.getconn()
-
-            cursor = connection.cursor()
-
-            cursor.execute(
-                """
-                    SELECT * FROM crawldb.page WHERE hash_content=%s;
-                """,
-                (hash_content,)
-            )
-
-            connection.commit()
-
-            page = cursor.fetchone()
-
-            return page is not None
-
-        except (Exception, psycopg2.DatabaseError) as error:
-            print("[ERROR WHILE CHECKING PAGE DUPLICATE]", error)
-        finally:
-            if connection:
-                self.connection_pool.putconn(connection)
-
-    """
         Find a site in the database by the domain name and return it if it exists
     """
     def get_site(self, domain):
@@ -384,14 +356,14 @@ class DatabaseHandler:
 
             connection.commit()
 
-            id = cursor.fetchone()[0]
+            site_id = cursor.fetchone()[0]
 
-            if id is None:
+            if site_id is None:
                 print("[ERROR WHILE INSERTING SITE] Inserted site was not found")
 
             cursor.close()
 
-            return id
+            return site_id
         except (Exception, psycopg2.DatabaseError) as error:
             print("[ERROR WHILE INSERTING SITE]", error)
         finally:
