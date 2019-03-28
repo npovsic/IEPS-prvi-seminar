@@ -9,6 +9,7 @@ from database_handler import DatabaseHandler
 import re
 import time
 import hashlib
+import binascii
 
 # Create a global database handler for all processes to share
 database_handler = DatabaseHandler(0, 100)
@@ -557,11 +558,44 @@ class CrawlerProcess:
         The duplicate page should not have the html_content value set, page_type_code should be DUPLICATE and
          that's it
     """
-    # TODO: check for duplicates
+    # TODO: check for duplicates using LSH method
     def is_duplicate_page(self, html_content):
         h = self.create_content_hash(html_content)
 
+        self.text_to_shingle_set(self.remove_markups(html_content))
+
         return database_handler.find_page_duplicate(h)
+
+    def remove_markups(self, html_content):
+        return BeautifulSoup(html_content, "html.parser").text
+
+    def text_to_shingle_set(self, text):
+        words = text.split()
+
+        print("WORDS: ", words)
+
+        # keeps word shingles
+        shinglesInDocWords = set()
+
+        # keeps hashed shingles
+        shinglesInDocInts = set()
+
+        shingle = []
+
+        shingleSize = 5
+
+        for index in range(len(words) - shingleSize + 1):
+            shingle = words[index:index + shingleSize]
+            shingle = ' '.join(shingle)
+
+            #Hash the shingle to a 32-bit integer
+            crc = binascii.crc32(shingle.encode()) & 0xffffffff
+
+            if shingle not in shinglesInDocWords:
+                shinglesInDocWords.add(shingle)
+
+            if crc not in  shinglesInDocInts:
+                shinglesInDocInts.add(crc)
 
     def add_page_to_frontier_array(self, page_url):
         if ALLOWED_DOMAIN in page_url:
