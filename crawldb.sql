@@ -47,6 +47,7 @@ CREATE TABLE crawldb.page_data
   page_id        integer,
   data_type_code varchar(20),
   "data"         bytea,
+  data_size      integer,
   CONSTRAINT pk_page_data_id PRIMARY KEY (id)
 );
 
@@ -61,6 +62,7 @@ CREATE TABLE crawldb.image
   filename      varchar(255),
   content_type  varchar(50),
   "data"        bytea,
+  data_size      integer,
   accessed_time timestamp,
   CONSTRAINT pk_image_id PRIMARY KEY (id)
 );

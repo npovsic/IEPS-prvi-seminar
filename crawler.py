@@ -216,6 +216,7 @@ class CrawlerProcess:
                     "page_id": self.current_page["id"],
                     "content_type": content_type,
                     "data": page_response.content,
+                    "data_size": page_response.headers["content-length"],
                     "accessed_time": datetime.now(),
                     "filename": filename
                 }
@@ -244,7 +245,8 @@ class CrawlerProcess:
                     page_data = {
                         "page_id": self.current_page["id"],
                         "data_type_code": data_type_code,
-                        "data": page_response.content
+                        "data": page_response.content,
+                        "data_size": page_response.headers["content-length"]
                     }
 
                     database_handler.insert_page_data(page_data)

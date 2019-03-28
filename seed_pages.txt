@@ -1,7 +1,7 @@
 http://evem.gov.si
-#https://e-uprava.gov.si/
-#https://podatki.gov.si/
-#http://www.e-prostor.gov.si/
+https://e-uprava.gov.si/
+https://podatki.gov.si/
+http://www.e-prostor.gov.si/
 #http://eugo.gov.si/
 #http://www.gov.si/
 #http://prostor3.gov.si/javni

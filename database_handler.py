@@ -340,10 +340,10 @@ class DatabaseHandler:
 
             cursor.execute(
                 """
-                    INSERT INTO crawldb.page_data(page_id, data_type_code, data)
-                    VALUES (%s, %s, %s);
+                    INSERT INTO crawldb.page_data(page_id, data_type_code, data, data_size)
+                    VALUES (%s, %s, %s, %s);
                 """,
-                (page_data["page_id"], page_data["data_type_code"], page_data["data"])
+                (page_data["page_id"], page_data["data_type_code"], page_data["data"], page_data["data_size"])
             )
 
             connection.commit()
@@ -368,11 +368,11 @@ class DatabaseHandler:
 
             cursor.execute(
                 """
-                    INSERT INTO crawldb.image(page_id, filename, content_type, data, accessed_time)
-                    VALUES (%s, %s, %s, %s, %s);
+                    INSERT INTO crawldb.image(page_id, filename, content_type, data, data_size, accessed_time)
+                    VALUES (%s, %s, %s, %s, %s, %s);
                 """,
                 (image_data["page_id"], image_data["filename"], image_data["content_type"], image_data["data"],
-                 image_data["accessed_time"])
+                 image_data["data_size"], image_data["accessed_time"])
             )
 
             connection.commit()
