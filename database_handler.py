@@ -175,55 +175,57 @@ class DatabaseHandler:
             connection = self.connection_pool.getconn()
 
             for page in pages_to_add:
-                try:
-                    cursor = connection.cursor()
-
-                    cursor.execute(
-                        """
-                            SELECT * FROM crawldb.page 
-                            WHERE url=%s
-                        """,
-                        (page["to"],)
-                    )
-
-                    # Check if the page already exists
-                    to_page = cursor.fetchone()
-
-                    cursor.close()
-
-                    if to_page is None:
+                # avoid spider traps - if page's URL is longer than limit, do not add it to frontier
+                if len(page["to"]) <= MAX_URL_LEN:
+                    try:
                         cursor = connection.cursor()
 
                         cursor.execute(
                             """
-                                INSERT INTO crawldb.page("url", "page_type_code", "added_at_time") 
-                                VALUES(%s, %s, %s)
-                                RETURNING id;
+                                SELECT * FROM crawldb.page 
+                                WHERE url=%s
                             """,
-                            (page["to"], "FRONTIER", datetime.now())
+                            (page["to"],)
                         )
 
-                        connection.commit()
-
+                        # Check if the page already exists
                         to_page = cursor.fetchone()
 
                         cursor.close()
 
-                    self.link_pages(page["from"], to_page[0])
-                except psycopg2.IntegrityError:
-                    print("[ERROR WHILE ADDING PAGES TO FRONTIER] Integrity error, adding a duplicate url")
+                        if to_page is None:
+                            cursor = connection.cursor()
 
-                    # Do not print duplicate key errors (integrity error is thrown when inserting a duplicate url)
+                            cursor.execute(
+                                """
+                                    INSERT INTO crawldb.page("url", "page_type_code", "added_at_time") 
+                                    VALUES(%s, %s, %s)
+                                    RETURNING id;
+                                """,
+                                (page["to"], "FRONTIER", datetime.now())
+                            )
 
-                    self.connection_pool.putconn(connection)
+                            connection.commit()
 
-                    connection = self.connection_pool.getconn()
-                except (Exception, psycopg2.DatabaseError) as error:
-                    print("[ERROR WHILE ADDING PAGES TO FRONTIER]", error)
+                            to_page = cursor.fetchone()
 
-                    self.connection_pool.putconn(connection)
+                            cursor.close()
 
-                    connection = self.connection_pool.getconn()
+                        self.link_pages(page["from"], to_page[0])
+                    except psycopg2.IntegrityError:
+                        print("[ERROR WHILE ADDING PAGES TO FRONTIER] Integrity error, adding a duplicate url")
+
+                        # Do not print duplicate key errors (integrity error is thrown when inserting a duplicate url)
+
+                        self.connection_pool.putconn(connection)
+
+                        connection = self.connection_pool.getconn()
+                    except (Exception, psycopg2.DatabaseError) as error:
+                        print("[ERROR WHILE ADDING PAGES TO FRONTIER]", error)
+
+                        self.connection_pool.putconn(connection)
+
+                        connection = self.connection_pool.getconn()
         except (Exception, psycopg2.DatabaseError) as error:
             print("[ERROR WHILE ADDING PAGES TO FRONTIER]", error)
         finally:
