@@ -3,6 +3,9 @@ from psycopg2 import pool
 from config import config
 from datetime import datetime
 
+# Maximum length of url (characters)
+# https://stackoverflow.com/questions/417142/what-is-the-maximum-length-of-a-url-in-different-browsers
+MAX_URL_LEN = 2000
 
 MAX_BINARY_TABLE_SIZE = 1024 * 1024 * 1024  # 1GB
 
@@ -139,27 +142,28 @@ class DatabaseHandler:
     def add_page_to_frontier(self, seed_page):
         connection = None
 
-        try:
-            connection = self.connection_pool.getconn()
+        if len(seed_page) <= MAX_URL_LEN:
+            try:
+                connection = self.connection_pool.getconn()
 
-            cursor = connection.cursor()
+                cursor = connection.cursor()
 
-            cursor.execute(
-                """
-                    INSERT INTO crawldb.page("url", "page_type_code") 
-                    VALUES(%s, %s);
-                """,
-                (seed_page, "FRONTIER")
-            )
+                cursor.execute(
+                    """
+                        INSERT INTO crawldb.page("url", "page_type_code") 
+                        VALUES(%s, %s);
+                    """,
+                    (seed_page, "FRONTIER")
+                )
 
-            connection.commit()
+                connection.commit()
 
-            cursor.close()
-        except (Exception, psycopg2.DatabaseError) as error:
-            print("[ERROR WHILE ADDING PAGE TO FRONTIER]", error)
-        finally:
-            if connection:
-                self.connection_pool.putconn(connection)
+                cursor.close()
+            except (Exception, psycopg2.DatabaseError) as error:
+                print("[ERROR WHILE ADDING PAGE TO FRONTIER]", error)
+            finally:
+                if connection:
+                    self.connection_pool.putconn(connection)
 
     """
         Add multiple pages to the frontier

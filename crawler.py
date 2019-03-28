@@ -631,8 +631,13 @@ class CrawlerProcess:
             if shingle not in shinglesInDocWords:
                 shinglesInDocWords.add(shingle)
 
-            if crc not in  shinglesInDocInts:
+            if crc not in shinglesInDocInts:
                 shinglesInDocInts.add(crc)
+
+        print("AAAAAAAAA: ", shinglesInDocWords)
+        print("BBBBBBBBB: ", shinglesInDocInts)
+
+
 
     def add_page_to_frontier_array(self, page_url):
         if ALLOWED_DOMAIN in page_url:
