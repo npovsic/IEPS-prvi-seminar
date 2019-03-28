@@ -4,6 +4,9 @@ from config import config
 from datetime import datetime
 
 
+MAX_BINARY_TABLE_SIZE = 1024 * 1024 * 1024  # 1GB
+
+
 class DatabaseHandler:
     def __init__(self, minimum_connections, max_connections):
         # Set a lock object, so that only one connection to the database is allowed

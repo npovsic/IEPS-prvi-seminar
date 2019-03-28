@@ -50,6 +50,8 @@ class Crawler:
 
         self.lock = Lock()
 
+        start = time.time()
+
         with open("seed_pages.txt", "r") as seed_pages:
             for seed_page in seed_pages:
                 if "#" not in seed_page:
@@ -112,7 +114,11 @@ class CrawlerProcess:
             if self.current_page:
                 number_of_retries = 0
 
-                self.crawl()
+                try:
+                    self.crawl()
+                except Exception as error:
+                    print("[CRAWLER PROCESS] An unhandled error occurred while parsing page: {}".format(
+                        self.current_page["url"]), error)
             else:
                 # No page was fetched from the frontier, try again in DELAY seconds
                 number_of_retries += 1
@@ -196,7 +202,6 @@ class CrawlerProcess:
 
                     if len(parsed_page['links']):
                         for link in parsed_page['links']:
-
                             self.add_page_to_frontier_array(link)
 
                     if len(parsed_page['images']):
@@ -216,7 +221,7 @@ class CrawlerProcess:
                     "page_id": self.current_page["id"],
                     "content_type": content_type,
                     "data": page_response.content,
-                    "data_size": page_response.headers["content-length"],
+                    "data_size": len(page_response.content),
                     "accessed_time": datetime.now(),
                     "filename": filename
                 }
@@ -246,7 +251,7 @@ class CrawlerProcess:
                         "page_id": self.current_page["id"],
                         "data_type_code": data_type_code,
                         "data": page_response.content,
-                        "data_size": page_response.headers["content-length"]
+                        "data_size": len(page_response.content)
                     }
 
                     database_handler.insert_page_data(page_data)
@@ -268,11 +273,11 @@ class CrawlerProcess:
 
         print(" {} - [CRAWLING] Finished crawling".format(self.current_process_id))
 
-
     """
         Fetch a response from the url, so that we get the status code and find out if any errors occur while fetching
         (some sites for example require a certificate to connect, some sites timeout, etc.)
     """
+
     def fetch_response(self, url):
         try:
             response = requests.get(url)
@@ -286,6 +291,7 @@ class CrawlerProcess:
     """
         Create a new site object and insert it into the database
     """
+
     def create_site(self, domain):
         # We need to create a new site object
 
@@ -320,6 +326,7 @@ class CrawlerProcess:
         Fetch and render the site in the chrome driver then return the resulting html so that it can be saved in the 
         current page html_content
     """
+
     def fetch_rendered_page_source(self, url):
         self.driver.get(url)
 
@@ -329,6 +336,7 @@ class CrawlerProcess:
         Get the domain name of the current site so that we can check if the site is already in the database or if we
         have to create it
     """
+
     def get_domain_url(self, url):
         parsed_uri = urlparse(url)
 
@@ -338,6 +346,7 @@ class CrawlerProcess:
         Get the filename from an online image resource
         https://stackoverflow.com/questions/10552188/python-split-url-to-find-image-name-and-extension
     """
+
     def get_image_filename(self, image_url):
         filename = image_url.split('/')[-1]
 
@@ -365,6 +374,7 @@ class CrawlerProcess:
         This function parses the robots.txt from memory using the modified robotparser class
         The self.robots_parser includes functions to check if the parser is allowed to parse a certain site
     """
+
     def parse_robots(self, robots_text):
         self.robots_parser = RobotFileParser(robots_text)
         self.robots_parser.read()
@@ -374,6 +384,7 @@ class CrawlerProcess:
         
         This only works for the standard XML sitemap
     """
+
     # TODO: error handling
     def parse_sitemap(self, sitemap_xml):
         soup = BeautifulSoup(sitemap_xml, 'lxml')
@@ -392,6 +403,7 @@ class CrawlerProcess:
     """
         Checks if robots are set for the current site and if they allow the crawling of the current page
     """
+
     def allowed_to_crawl_current_page(self, url):
         if self.robots_parser is not None:
             return self.robots_parser.can_fetch('*', url)
@@ -406,6 +418,7 @@ class CrawlerProcess:
         just means that the desired element is no longer rendered in DOM. Maybe the memory was getting low, since I got the
         error when I was running 10 crawler processes.
     """
+
     def parse_page(self, html_content):
         links = []
         images = []
@@ -459,6 +472,7 @@ class CrawlerProcess:
     """
         Find all the hrefs that are set in javascript code (window.location changes)
     """
+
     def parse_links_from_javacript(self, javascript_text):
         links = re.findall(r'(http://|https://)([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?',
                            javascript_text)
@@ -473,6 +487,7 @@ class CrawlerProcess:
     """
         Create a parsed url (ignore javascript and html actions, remove hashes, fix relative urls etc.)
     """
+
     def get_parsed_url(self, url):
         if url is None or url is "":
             return None
@@ -527,6 +542,7 @@ class CrawlerProcess:
     """
         Parse image urls
     """
+
     def get_parsed_image_url(self, url):
         if url is None or url is "":
             return None
@@ -564,6 +580,7 @@ class CrawlerProcess:
         The duplicate page should not have the html_content value set, page_type_code should be DUPLICATE and
          that's it
     """
+
     # TODO: check for duplicates
     def is_duplicate_page(self, html_content):
         print("Check duplicated")
