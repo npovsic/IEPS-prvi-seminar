@@ -12,6 +12,8 @@ MAX_URL_LEN = 2000
 
 MAX_BINARY_TABLE_SIZE = 1024 * 1024 * 1024  # 1GB
 
+MAX_PAGES_TABLE_ROWS = 100000
+
 
 class DatabaseHandler:
     def __init__(self, minimum_connections, max_connections):
@@ -97,6 +99,35 @@ class DatabaseHandler:
             lock.release()
 
     """
+        Return the page back to the frontier, used mainly for crawl delay purposes
+    """
+    def return_page_to_frontier(self, current_page):
+        connection = None
+
+        try:
+            connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    UPDATE crawldb.page 
+                    SET active_in_crawler=NULL 
+                    WHERE id=%s;
+                """,
+                (current_page["id"],)
+            )
+
+            connection.commit()
+
+            cursor.close()
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("[ERROR WHILE RETURNING PAGE TO FRONTIER]", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
+
+    """
         Create a new entry in the links table
     """
     def link_pages(self, from_page, to_page):
@@ -142,7 +173,7 @@ class DatabaseHandler:
     """
         Add a single page to the frontier
     """
-    def add_page_to_frontier(self, seed_page):
+    def add_seed_page_to_frontier(self, seed_page):
         connection = None
 
         if len(seed_page) <= MAX_URL_LEN:
@@ -153,10 +184,10 @@ class DatabaseHandler:
 
                 cursor.execute(
                     """
-                        INSERT INTO crawldb.page("url", "page_type_code") 
-                        VALUES(%s, %s);
+                        INSERT INTO crawldb.page("url", "page_type_code", "added_at_time") 
+                        VALUES(%s, %s, %s);
                     """,
-                    (seed_page, "FRONTIER")
+                    (seed_page, "FRONTIER", datetime.now())
                 )
 
                 connection.commit()
@@ -176,6 +207,24 @@ class DatabaseHandler:
 
         try:
             connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    SELECT COUNT(id) 
+                    FROM crawldb.page 
+                """
+            )
+
+            number_of_pages = cursor.fetchone()[0]
+
+            cursor.close()
+
+            if number_of_pages > MAX_PAGES_TABLE_ROWS:
+                # The limit for the pages table has been reached
+
+                return
 
             for page in pages_to_add:
                 # avoid spider traps - if page's URL is longer than limit, do not add it to frontier
@@ -342,7 +391,8 @@ class DatabaseHandler:
             return {
                 "id": site[0],
                 "domain": site[1],
-                "robots_content": site[2]
+                "robots_content": site[2],
+                "last_crawled_at": site[4]
             }
         except (Exception, psycopg2.DatabaseError) as error:
             print("[ERROR WHILE FETCHING SITE]", error)
@@ -398,6 +448,27 @@ class DatabaseHandler:
 
             cursor.execute(
                 """
+                    SELECT SUM(data_size)
+                    FROM crawldb.page_data
+                """
+            )
+
+            size_of_page_data_table = cursor.fetchone()[0]
+
+            if size_of_page_data_table is None:
+                size_of_page_data_table = 0
+
+            cursor.close()
+
+            if (size_of_page_data_table + page_data["data_size"]) >= MAX_BINARY_TABLE_SIZE:
+                # The size limit set for the table has been reached
+
+                return
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
                     INSERT INTO crawldb.page_data(page_id, data_type_code, data, data_size)
                     VALUES (%s, %s, %s, %s);
                 """,
@@ -421,6 +492,27 @@ class DatabaseHandler:
 
         try:
             connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    SELECT SUM(data_size)
+                    FROM crawldb.image
+                """
+            )
+
+            size_of_images_table = cursor.fetchone()[0]
+
+            if size_of_images_table is None:
+                size_of_images_table = 0
+
+            cursor.close()
+
+            if (size_of_images_table + image_data["data_size"]) >= MAX_BINARY_TABLE_SIZE:
+                # The size limit set for the table has been reached
+
+                return
 
             cursor = connection.cursor()
 

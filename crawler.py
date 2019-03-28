@@ -1,9 +1,9 @@
-from multiprocessing import Process, current_process, Lock
+from multiprocessing import Process, Lock
 import requests
 from selenium import webdriver
 from bs4 import BeautifulSoup
 from urllib.parse import urlparse, quote
-from datetime import datetime
+from datetime import datetime, timedelta
 from robotparser import RobotFileParser
 from database_handler import DatabaseHandler
 import re
@@ -57,7 +57,7 @@ class Crawler:
         with open("seed_pages.txt", "r") as seed_pages:
             for seed_page in seed_pages:
                 if "#" not in seed_page:
-                    database_handler.add_page_to_frontier(seed_page.strip())
+                    database_handler.add_seed_page_to_frontier(seed_page.strip())
 
         # When starting the crawler reset frontier active flags
         database_handler.reset_frontier()
@@ -173,6 +173,9 @@ class CrawlerProcess:
             database_handler.remove_page_from_frontier(self.current_page)
 
             return
+        else:
+            # If a crawl delay is available in robots wait until the page can be crawled then continue
+            self.wait_for_crawl_delay_to_elapse()
 
         # The crawler is allowed to crawl the current site, therefore we can perform a request
         page_response = self.fetch_response(self.current_page["url"])
@@ -391,6 +394,7 @@ class CrawlerProcess:
         
         This only works for the standard XML sitemap
     """
+
     def parse_sitemap(self, sitemap_xml):
         soup = BeautifulSoup(sitemap_xml, 'lxml')
 
@@ -414,6 +418,30 @@ class CrawlerProcess:
             return self.robots_parser.can_fetch('*', url)
 
         return True
+
+    """
+        Checks if crawl-delay property is set and if it exists check if the required time has elapsed
+    """
+
+    def wait_for_crawl_delay_to_elapse(self):
+        if self.robots_parser is not None:
+            crawl_delay = self.robots_parser.crawl_delay('*')
+
+            if crawl_delay is not None:
+                if "last_crawled_at" in self.site:
+                    site_last_crawled_at = self.site["last_crawled_at"]
+
+                    can_crawl_again_at = site_last_crawled_at + timedelta(seconds=crawl_delay)
+
+                    current_time = datetime.now()
+
+                    time_difference = (can_crawl_again_at - current_time).total_seconds()
+
+                    if time_difference > 0:
+                        print("     [CRAWLING] Crawl delay has not yet elapsed for site: {}".format(
+                            self.site["domain"]))
+
+                        time.sleep(crawl_delay)
 
     """
         Use the chrome driver to fetch all links and image sources in the rendered page (the driver already returns 
@@ -519,6 +547,9 @@ class CrawlerProcess:
                 # This is the index page, which we already have in the frontier
                 return None
 
+            if "www." in url:
+                url = "http://{}".format(url).strip()
+
             """
                 Fix relative urls just in case
                 
@@ -592,6 +623,7 @@ class CrawlerProcess:
         The duplicate page should not have the html_content value set, page_type_code should be DUPLICATE and
          that's it
     """
+
     def is_duplicate_page(self, html_content):
         h = self.create_content_hash(html_content)
 
