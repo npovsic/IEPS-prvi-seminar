@@ -4,6 +4,9 @@ from psycopg2 import pool
 from config import config
 from datetime import datetime
 
+# Maximum length of url (characters)
+# https://stackoverflow.com/questions/417142/what-is-the-maximum-length-of-a-url-in-different-browsers
+MAX_URL_LEN = 2000
 
 class DatabaseHandler:
     def __init__(self, minimum_connections, max_connections):
@@ -120,27 +123,28 @@ class DatabaseHandler:
     def add_page_to_frontier(self, seed_page):
         connection = None
 
-        try:
-            connection = self.connection_pool.getconn()
+        if len(seed_page) <= MAX_URL_LEN:
+            try:
+                connection = self.connection_pool.getconn()
 
-            cursor = connection.cursor()
+                cursor = connection.cursor()
 
-            cursor.execute(
-                """
-                    INSERT INTO crawldb.page("url", "page_type_code") 
-                    VALUES(%s, %s);
-                """,
-                (seed_page, "FRONTIER")
-            )
+                cursor.execute(
+                    """
+                        INSERT INTO crawldb.page("url", "page_type_code") 
+                        VALUES(%s, %s);
+                    """,
+                    (seed_page, "FRONTIER")
+                )
 
-            connection.commit()
+                connection.commit()
 
-            cursor.close()
-        except (Exception, psycopg2.DatabaseError) as error:
-            print("[ERROR WHILE ADDING PAGE TO FRONTIER]", error)
-        finally:
-            if connection:
-                self.connection_pool.putconn(connection)
+                cursor.close()
+            except (Exception, psycopg2.DatabaseError) as error:
+                print("[ERROR WHILE ADDING PAGE TO FRONTIER]", error)
+            finally:
+                if connection:
+                    self.connection_pool.putconn(connection)
 
     """
         Add multiple pages to the frontier
@@ -153,38 +157,42 @@ class DatabaseHandler:
                 connection = self.connection_pool.getconn()
 
                 for page in pages_to_add:
-                    try:
-                        cursor = connection.cursor()
 
-                        cursor.execute(
-                            """
-                                INSERT INTO crawldb.page("url", "page_type_code", "added_at_time") 
-                                VALUES(%s, %s, %s)
-                                RETURNING id;
-                            """,
-                            (page["to"], "FRONTIER", datetime.now())
-                        )
+                    # avoid spider traps - if page's URL is longer than limit, do not add it to frontier
+                    if len(page["to"]) <= MAX_URL_LEN:
 
-                        connection.commit()
+                        try:
+                            cursor = connection.cursor()
 
-                        to_page = cursor.fetchone()[0]
+                            cursor.execute(
+                                """
+                                    INSERT INTO crawldb.page("url", "page_type_code", "added_at_time") 
+                                    VALUES(%s, %s, %s)
+                                    RETURNING id;
+                                """,
+                                (page["to"], "FRONTIER", datetime.now())
+                            )
 
-                        self.link_pages(page["from"], to_page)
+                            connection.commit()
 
-                        cursor.close()
+                            to_page = cursor.fetchone()[0]
 
-                    except psycopg2.IntegrityError:
-                        # Do not print duplicate key errors (integrity error is thrown when inserting a duplicate url)
+                            self.link_pages(page["from"], to_page)
 
-                        self.connection_pool.putconn(connection)
+                            cursor.close()
 
-                        connection = self.connection_pool.getconn()
-                    except (Exception, psycopg2.DatabaseError) as error:
-                        print("[ERROR WHILE ADDING PAGES TO FRONTIER]", error)
+                        except psycopg2.IntegrityError:
+                            # Do not print duplicate key errors (integrity error is thrown when inserting a duplicate url)
 
-                        self.connection_pool.putconn(connection)
+                            self.connection_pool.putconn(connection)
 
-                        connection = self.connection_pool.getconn()
+                            connection = self.connection_pool.getconn()
+                        except (Exception, psycopg2.DatabaseError) as error:
+                            print("[ERROR WHILE ADDING PAGES TO FRONTIER]", error)
+
+                            self.connection_pool.putconn(connection)
+
+                            connection = self.connection_pool.getconn()
             except (Exception, psycopg2.DatabaseError) as error:
                 print("[ERROR WHILE ADDING PAGES TO FRONTIER]", error)
             finally:
