@@ -183,7 +183,11 @@ class CrawlerProcess:
         if page_response:
             # No errors while fetching the response
 
-            content_type = page_response.headers['content-type']
+            content_type = ""
+
+            if "content-type" in page_response.headers:
+                # Content type is not necessarily always present (e. g. when Transfer-Encoding is set)
+                content_type = page_response.headers['content-type']
 
             self.current_page["http_status_code"] = page_response.status_code
 
@@ -528,7 +532,7 @@ class CrawlerProcess:
 
         domain = self.site["domain"]
 
-        if 'http' not in url:
+        if not url.startswith("http"):
             # Since the chrome driver returns absolute urls, the url is most likely javascript or action
 
             if 'javascript:' in url:
@@ -547,7 +551,7 @@ class CrawlerProcess:
                 # This is the index page, which we already have in the frontier
                 return None
 
-            if "www." in url:
+            if url.startswith("www"):
                 url = "http://{}".format(url).strip()
 
             """

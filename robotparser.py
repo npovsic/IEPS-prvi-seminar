@@ -166,8 +166,10 @@ class RobotFileParser:
             return None
         for entry in self.entries:
             if entry.applies_to(useragent):
-                return entry.delay
-        return self.default_entry.delay
+                if entry is not None:
+                    return entry.delay
+        if self.default_entry is not None:
+            return self.default_entry.delay
 
     def request_rate(self, useragent):
         if not self.mtime():

@@ -224,6 +224,8 @@ class DatabaseHandler:
             if number_of_pages > MAX_PAGES_TABLE_ROWS:
                 # The limit for the pages table has been reached
 
+                print("[DATABASE] The number of pages exceeds the limit")
+
                 return
 
             for page in pages_to_add:
