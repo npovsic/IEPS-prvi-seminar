@@ -3,7 +3,6 @@ from psycopg2 import pool
 from config import config
 from datetime import datetime
 
-
 """
     Maximum length of url (characters)
     https://stackoverflow.com/questions/417142/what-is-the-maximum-length-of-a-url-in-different-browsers
@@ -43,6 +42,7 @@ class DatabaseHandler:
     """
         This function uses the lock so that no two crawler processes get the same frontier url
     """
+
     def get_page_from_frontier(self, lock):
         lock.acquire()
 
@@ -88,7 +88,9 @@ class DatabaseHandler:
 
             return {
                 'id': frontier[0],
-                'url': frontier[3]
+                'url': frontier[3],
+                'html_content': None,
+                'hash_content': None
             }
         except (Exception, psycopg2.DatabaseError) as error:
             print("[ERROR WHILE FETCHING PAGE FROM FRONTIER]", error)
@@ -101,6 +103,7 @@ class DatabaseHandler:
     """
         Return the page back to the frontier, used mainly for crawl delay purposes
     """
+
     def return_page_to_frontier(self, current_page):
         connection = None
 
@@ -130,6 +133,7 @@ class DatabaseHandler:
     """
         Create a new entry in the links table
     """
+
     def link_pages(self, from_page, to_page):
         connection = None
 
@@ -173,6 +177,7 @@ class DatabaseHandler:
     """
         Add a single page to the frontier
     """
+
     def add_seed_page_to_frontier(self, seed_page):
         connection = None
 
@@ -202,6 +207,7 @@ class DatabaseHandler:
     """
         Add multiple pages to the frontier
     """
+
     def add_pages_to_frontier(self, pages_to_add):
         connection = None
 
@@ -289,6 +295,7 @@ class DatabaseHandler:
     """
         Remove the page from the frontier and populate all the necessary data
     """
+
     def remove_page_from_frontier(self, current_page):
         connection = None
 
@@ -300,12 +307,13 @@ class DatabaseHandler:
             cursor.execute(
                 """
                     UPDATE crawldb.page 
-                    SET site_id=%s, page_type_code=%s, html_content=%s, http_status_code=%s, 
+                    SET site_id=%s, page_type_code=%s, html_content=%s, hash_content=%s, http_status_code=%s, 
                     accessed_time=%s, active_in_crawler=NULL 
                     WHERE id=%s;
                 """,
                 (current_page["site_id"], current_page["page_type_code"], current_page["html_content"],
-                 current_page["http_status_code"], current_page["accessed_time"], current_page["id"])
+                 current_page["hash_content"], current_page["http_status_code"], current_page["accessed_time"],
+                 current_page["id"])
             )
 
             connection.commit()
@@ -366,6 +374,7 @@ class DatabaseHandler:
     """
         Find a site in the database by the domain name and return it if it exists
     """
+
     def get_site(self, domain):
         connection = None
 
@@ -405,6 +414,7 @@ class DatabaseHandler:
     """
         Create a new site if it doesn't exist and return its id
     """
+
     def insert_site(self, site):
         connection = None
 
@@ -440,6 +450,7 @@ class DatabaseHandler:
     """
         Insert binary non-image page data
     """
+
     def insert_page_data(self, page_data):
         connection = None
 
@@ -489,6 +500,7 @@ class DatabaseHandler:
     """
         Insert the image that the crawler fetched
     """
+
     def insert_image_data(self, image_data):
         connection = None
 
@@ -536,11 +548,11 @@ class DatabaseHandler:
             if connection:
                 self.connection_pool.putconn(connection)
 
-
     """
         The crawler might have been shut down prematurely and some pages may have the active_in_crawler flag still set
         This function simply resets all active_in_crawler flags
     """
+
     def reset_frontier(self):
         connection = None
 
@@ -569,6 +581,7 @@ class DatabaseHandler:
     """
         Used for debugging only, as the name suggests it RESETS THE DATABASE TO ITS INITIAL STATE
     """
+
     def reset_database(self):
         connection = None
 

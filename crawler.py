@@ -168,8 +168,6 @@ class CrawlerProcess:
 
             self.current_page["http_status_code"] = 500
 
-            self.current_page["html_content"] = None
-
             database_handler.remove_page_from_frontier(self.current_page)
 
             return
@@ -196,38 +194,39 @@ class CrawlerProcess:
 
                 html_content = self.fetch_rendered_page_source(self.current_page["url"])
 
-                if self.is_duplicate_page(html_content):
-                    print("     [CRAWLING] Found page duplicate, that has already been parsed: ",
-                          self.current_page["url"])
+                if html_content is not None:
+                    if self.is_duplicate_page(html_content):
+                        print("     [CRAWLING] Found page duplicate, that has already been parsed: ",
+                              self.current_page["url"])
 
-                    self.current_page["page_type_code"] = PAGE_TYPES["duplicate"]
+                        self.current_page["page_type_code"] = PAGE_TYPES["duplicate"]
+                    else:
+                        self.current_page["page_type_code"] = PAGE_TYPES["html"]
 
-                    self.current_page["html_content"] = None
+                        self.current_page["html_content"] = html_content
 
-                    self.current_page["hash_content"] = None
+                        self.current_page["hash_content"] = self.create_content_hash(html_content)
+
+                        parsed_page = self.parse_page(self.current_page["html_content"])
+
+                        if len(parsed_page['links']):
+                            for link in parsed_page['links']:
+                                self.add_page_to_frontier_array(link)
+
+                        if len(parsed_page['images']):
+                            for image_url in parsed_page['images']:
+                                self.add_page_to_frontier_array(image_url)
                 else:
-                    self.current_page["page_type_code"] = PAGE_TYPES["html"]
+                    # An error occurred while rendering page
 
-                    self.current_page["html_content"] = html_content
+                    self.current_page["page_type_code"] = PAGE_TYPES["error"]
 
-                    self.current_page["hash_content"] = self.create_content_hash(html_content)
-
-                    parsed_page = self.parse_page(self.current_page["html_content"])
-
-                    if len(parsed_page['links']):
-                        for link in parsed_page['links']:
-                            self.add_page_to_frontier_array(link)
-
-                    if len(parsed_page['images']):
-                        for image_url in parsed_page['images']:
-                            self.add_page_to_frontier_array(image_url)
+                    self.current_page["http_status_code"] = 500
 
             elif CONTENT_TYPES["IMG"] in content_type:
                 # We can be pretty sure that we have an image
 
                 self.current_page["page_type_code"] = PAGE_TYPES["image"]
-
-                self.current_page["html_content"] = None
 
                 filename = self.get_image_filename(self.current_page["url"])
 
@@ -246,8 +245,6 @@ class CrawlerProcess:
                 # The crawler detected a non-image binary file
 
                 self.current_page["page_type_code"] = PAGE_TYPES["binary"]
-
-                self.current_page["html_content"] = None
 
                 data_type_code = None
 
@@ -276,8 +273,6 @@ class CrawlerProcess:
             self.current_page["page_type_code"] = PAGE_TYPES["error"]
 
             self.current_page["http_status_code"] = 500
-
-            self.current_page["html_content"] = None
 
         # Update the page in the database, remove FRONTIER type and replace it with the correct one
         database_handler.remove_page_from_frontier(self.current_page)
@@ -342,9 +337,14 @@ class CrawlerProcess:
     """
 
     def fetch_rendered_page_source(self, url):
-        self.driver.get(url)
+        try:
+            self.driver.get(url)
 
-        return self.driver.page_source
+            return self.driver.page_source
+        except Exception as error:
+            print("     [CRAWLING] Error while fetching rendered page source", error)
+
+            return None
 
     """
         Get the domain name of the current site so that we can check if the site is already in the database or if we
@@ -428,24 +428,27 @@ class CrawlerProcess:
     """
 
     def wait_for_crawl_delay_to_elapse(self):
-        if self.robots_parser is not None:
-            crawl_delay = self.robots_parser.crawl_delay('*')
+        try:
+            if self.robots_parser is not None:
+                crawl_delay = self.robots_parser.crawl_delay('*')
 
-            if crawl_delay is not None:
-                if "last_crawled_at" in self.site:
-                    site_last_crawled_at = self.site["last_crawled_at"]
+                if crawl_delay is not None:
+                    if "last_crawled_at" in self.site and self.site["last_crawled_at"] is not None:
+                        site_last_crawled_at = self.site["last_crawled_at"]
 
-                    can_crawl_again_at = site_last_crawled_at + timedelta(seconds=crawl_delay)
+                        can_crawl_again_at = site_last_crawled_at + timedelta(seconds=crawl_delay)
 
-                    current_time = datetime.now()
+                        current_time = datetime.now()
 
-                    time_difference = (can_crawl_again_at - current_time).total_seconds()
+                        time_difference = (can_crawl_again_at - current_time).total_seconds()
 
-                    if time_difference > 0:
-                        print("     [CRAWLING] Crawl delay has not yet elapsed for site: {}".format(
-                            self.site["domain"]))
+                        if time_difference > 0:
+                            print("     [CRAWLING] Crawl delay has not yet elapsed for site: {}".format(
+                                self.site["domain"]))
 
-                        time.sleep(crawl_delay)
+                            time.sleep(crawl_delay)
+        except Exception as error:
+            print("     [CRAWLING] Error while handling crawl delay", error)
 
     """
         Use the chrome driver to fetch all links and image sources in the rendered page (the driver already returns 
@@ -511,13 +514,18 @@ class CrawlerProcess:
     """
 
     def parse_links_from_javacript(self, javascript_text):
-        links = re.findall(r'(http://|https://)([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?',
-                           javascript_text)
+        links = []
 
-        if not links:
-            return []
+        try:
+            links = re.findall(r'(http://|https://)([\w_-]+(?:(?:\.[\w_-]+)+))([\w.,@?^=%&:/~+#-]*[\w@?^=%&/~+#-])?',
+                               javascript_text)
 
-        links = [''.join(link) for link in links]
+            if not links:
+                return []
+
+            links = [''.join(link) for link in links]
+        except Exception as error:
+            print("     [CRAWLING] Error while parsing links from Javascript", error)
 
         return links
 
@@ -588,10 +596,10 @@ class CrawlerProcess:
             return None
 
         # Do not parse base64 images
-        if "data:image" in url:
+        if url.startswith("data:image"):
             return None
 
-        if 'http' not in url:
+        if not url.startswith("http"):
             # This is very unlikely, since the chrome driver returns all the image sources with absolute urls
 
             domain = self.site["domain"]
@@ -616,11 +624,16 @@ class CrawlerProcess:
         return url
 
     def create_content_hash(self, html_content):
-        m = hashlib.sha256()
+        try:
+            m = hashlib.sha256()
 
-        m.update(html_content.encode('utf-8'))
+            m.update(html_content.encode('utf-8'))
 
-        return m.hexdigest()
+            return m.hexdigest()
+        except Exception as error:
+            print("     [CRAWLING] Error while parsing links from Javascript", error)
+
+            return None
 
     """
         TODO: use a hash algorithm that return a similar value for similar pages
