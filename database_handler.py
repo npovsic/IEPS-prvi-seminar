@@ -1,3 +1,4 @@
+from urllib.parse import unquote
 import psycopg2
 from psycopg2 import pool
 from config import config
@@ -86,9 +87,12 @@ class DatabaseHandler:
 
             cursor.close()
 
+            # Decode the url
+            url = unquote(frontier[3])
+
             return {
                 'id': frontier[0],
-                'url': frontier[3],
+                'url': url,
                 'html_content': None,
                 'hash_content': None
             }

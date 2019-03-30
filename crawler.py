@@ -200,6 +200,8 @@ class CrawlerProcess:
                               self.current_page["url"])
 
                         self.current_page["page_type_code"] = PAGE_TYPES["duplicate"]
+
+                        self.current_page["hash_content"] = self.create_content_hash(html_content)
                     else:
                         self.current_page["page_type_code"] = PAGE_TYPES["html"]
 
