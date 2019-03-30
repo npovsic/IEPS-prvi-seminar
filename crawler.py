@@ -495,7 +495,7 @@ class CrawlerProcess:
                 links_from_javascript = self.parse_links_from_javacript(script_tag.text)
 
                 for link in links_from_javascript:
-                    links.append(link)
+                    links.append(self.get_parsed_url(link))
 
             return {
                 "links": links,
@@ -631,7 +631,7 @@ class CrawlerProcess:
 
             return m.hexdigest()
         except Exception as error:
-            print("     [CRAWLING] Error while parsing links from Javascript", error)
+            print("     [CRAWLING] Error while creating content hash", error)
 
             return None
 
@@ -678,7 +678,9 @@ class CrawlerProcess:
                 shingles_in_doc_ints.add(crc)
 
     def add_page_to_frontier_array(self, page_url):
-        if ALLOWED_DOMAIN in page_url:
+        page_domain = self.get_domain_url(page_url)
+
+        if ALLOWED_DOMAIN in page_domain:
             # Only add pages in the allowed domain
 
             self.pages_to_add_to_frontier.append({
