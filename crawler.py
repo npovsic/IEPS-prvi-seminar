@@ -10,9 +10,13 @@ import re
 import time
 import hashlib
 import binascii
+from hash_driver import HashDriver
 
 # Create a global database handler for all processes to share
 database_handler = DatabaseHandler(0, 100)
+
+# Create a global hash driver for creating page signatures
+hash_driver = HashDriver()
 
 # https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Complete_list_of_MIME_types
 CONTENT_TYPES = {
@@ -202,7 +206,12 @@ class CrawlerProcess:
                         self.current_page["page_type_code"] = PAGE_TYPES["duplicate"]
 
                         self.current_page["hash_content"] = self.create_content_hash(html_content)
+
                     else:
+                        # page is not treated as duplicate page - insert hash signature to db
+                        database_handler.insert_page_signatures(self.current_page["id"],
+                                                                self.current_page["hash_signature"])
+
                         self.current_page["page_type_code"] = PAGE_TYPES["html"]
 
                         self.current_page["html_content"] = html_content
@@ -645,39 +654,22 @@ class CrawlerProcess:
 
     def is_duplicate_page(self, html_content):
         h = self.create_content_hash(html_content)
+        hash_set = hash_driver.text_to_shingle_set(self.remove_markups(html_content))
 
-        self.text_to_shingle_set(self.remove_markups(html_content))
+        self.current_page["hash_signature"] = hash_set
 
-        return database_handler.find_page_duplicate(h)
+        if database_handler.find_page_duplicate(h):
+            return True
+        else:
+
+            #content_signature = hash_driver.minhash(shingle_set)
+
+
+            #print("MINHASH: ", content_signature)
+            return False
 
     def remove_markups(self, html_content):
         return BeautifulSoup(html_content, "html.parser").text
-
-    def text_to_shingle_set(self, text):
-        words = text.split()
-
-        # keeps word shingles
-        shingles_in_doc_words = set()
-
-        # keeps hashed shingles
-        shingles_in_doc_ints = set()
-
-        shingle = []
-
-        shingle_size = 5
-
-        for index in range(len(words) - shingle_size + 1):
-            shingle = words[index:index + shingle_size]
-            shingle = ' '.join(shingle)
-
-            # Hash the shingle to a 32-bit integer
-            crc = binascii.crc32(shingle.encode()) & 0xffffffff
-
-            if shingle not in shingles_in_doc_words:
-                shingles_in_doc_words.add(shingle)
-
-            if crc not in shingles_in_doc_ints:
-                shingles_in_doc_ints.add(crc)
 
     def add_page_to_frontier_array(self, page_url):
         page_domain = self.get_domain_url(page_url)

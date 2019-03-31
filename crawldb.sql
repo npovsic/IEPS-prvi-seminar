@@ -57,6 +57,18 @@ CREATE INDEX "idx_page_data_page_id" ON crawldb.page_data (page_id);
 
 CREATE INDEX "idx_page_data_data_type_code" ON crawldb.page_data (data_type_code);
 
+CREATE TABLE crawldb.content_hash
+(
+    id          serial NOT NULL,
+    page_id     integer,
+    hash        bigint[],
+    CONSTRAINT pk_content_hash_id PRIMARY KEY (id)
+);
+
+CREATE INDEX "idx_content_hash_page_id" ON crawldb.content_hash (page_id);
+
+CREATE INDEX "idx_content_hash_hash" ON crawldb.content_hash (hash);
+
 CREATE TABLE crawldb.image
 (
   id            serial NOT NULL,

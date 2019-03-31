@@ -373,6 +373,33 @@ class DatabaseHandler:
             if connection:
                 self.connection_pool.putconn(connection)
 
+    def insert_page_signatures(self, page_id, signatures):
+        connection = None
+
+        try:
+            connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+
+            cursor.execute(
+                """
+                    INSERT INTO crawldb.content_hash(page_id, hash)
+                    VALUES (%s, %s);
+                """,
+                (page_id, str(signatures))
+            )
+
+            connection.commit()
+
+            cursor.close()
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("[ERROR WHILE INSERTING HASH]", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
+
     """
         Find a site in the database by the domain name and return it if it exists
     """
