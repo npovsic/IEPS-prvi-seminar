@@ -1,15 +1,4 @@
-Instructions are available at: 
-
-    - http://zitnik.si/teaching/wier/PA1.html
-    
-    Ne obišči strani, ki niso gov.si, dodaj samo v link tabelo (from, to).
-    
-    Vprašanja:
-        - Kdaj končati parsanje?
-
-Creating a virtual environment:
-
-    - https://docs.python.org/3/library/venv.html
+###### PREREQUISITES:
 
 Installing Selenium and Google Chrome Headless:
 
@@ -43,3 +32,22 @@ BeautifulSoup:
 Parsing domain names:
 
     - https://docs.python.org/3/library/urllib.parse.html
+    
+###### INSTRUCTIONS:
+    
+The main elements of this crawler are Selenium and Headless Chrome, which are used to render sites and 
+then to scrape images and links. 
+
+STEPS:
+
+    1. Install all the required packages to your python interpreter
+        - psycopg2
+        - requests
+        - selenium
+        - bs4
+        
+    2. The chrome driver is already present in the directory, so you don't need to download it
+    
+    3. Start the crawler by running the start.py script
+        - The script creates a Crawler class and runs it
+        - The number of processes are set as an argument for the crawler
