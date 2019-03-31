@@ -373,6 +373,9 @@ class DatabaseHandler:
             if connection:
                 self.connection_pool.putconn(connection)
 
+    """
+        Insert hash signatures for current page
+    """
     def insert_page_signatures(self, page_id, signatures):
         connection = None
 
@@ -399,6 +402,10 @@ class DatabaseHandler:
             if connection:
                 self.connection_pool.putconn(connection)
 
+    """
+        Check out what is the percentage of similarity between current page containing set of hash signatures and 
+        already crawled pages
+    """
     def calculate_biggest_similarity(self, signatures):
         connection = None
 
@@ -412,8 +419,8 @@ class DatabaseHandler:
                    SELECT * 
                    FROM   crawldb.content_hash i, LATERAL (
                         SELECT count(*) AS ct
-                        FROM   unnest(i.hash) uid
-                        WHERE  uid = ANY(%s::bigint[])
+                        FROM   unnest(i.hash) signature
+                        WHERE  signature = ANY(%s::bigint[])
                     ) x, LATERAL (
                         SELECT (i.hash_length + %s) AS total_sum
                     ) y
