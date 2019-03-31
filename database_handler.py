@@ -381,13 +381,12 @@ class DatabaseHandler:
 
             cursor = connection.cursor()
 
-
             cursor.execute(
                 """
-                    INSERT INTO crawldb.content_hash(page_id, hash)
-                    VALUES (%s, %s);
+                    INSERT INTO crawldb.content_hash(page_id, hash, hash_length)
+                    VALUES (%s, %s, %s);
                 """,
-                (page_id, str(signatures))
+                (page_id, str(signatures), len(signatures))
             )
 
             connection.commit()
@@ -399,6 +398,51 @@ class DatabaseHandler:
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
+
+    def calculate_biggest_similarity(self, signatures):
+        connection = None
+
+        try:
+            connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                   SELECT * 
+                   FROM   crawldb.content_hash i, LATERAL (
+                        SELECT count(*) AS ct
+                        FROM   unnest(i.hash) uid
+                        WHERE  uid = ANY(%s::bigint[])
+                    ) x, LATERAL (
+                        SELECT (i.hash_length + %s) AS total_sum
+                    ) y
+                    ORDER  BY x.ct DESC, hash_length ASC; 
+                """,
+                (str(signatures), len(signatures))
+            )
+
+            connection.commit()
+
+            first_matching = cursor.fetchone()
+
+            if first_matching is None:
+                return 0
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("[ERROR WHILE FINDING SIMILAR PAGES]", error)
+        finally:
+
+            if connection:
+                self.connection_pool.putconn(connection)
+
+        if first_matching[4] > 0:
+
+            # calculate jaccard similarity (intersection over union)
+            return first_matching[4] / (first_matching[5] - first_matching[4])
+
+        else:
+            return 0
 
     """
         Find a site in the database by the domain name and return it if it exists
@@ -662,6 +706,16 @@ class DatabaseHandler:
 
             cursor.execute(
                 "DELETE FROM crawldb.site"
+            )
+
+            connection.commit()
+
+            cursor.close()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                "DELETE FROM crawldb.content_hash"
             )
 
             connection.commit()

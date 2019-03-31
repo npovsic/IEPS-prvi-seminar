@@ -1,19 +1,14 @@
 import binascii
-from random import randint
+import hashlib
 
-# minhash size
-N = 128
-max_val = (2 ** 32) - 1
-
+# size of substring shingle
+SHINGLE_SIZE = 10
 
 class HashDriver:
-    def __init__(self):
-        # create N tuples that will serve as permutation functions
-        # these permutation values are used to hash all input sets
-        self.perms = [(randint(0, max_val), randint(0, max_val)) for i in range(N)]
 
-        self.prime = 4294967311
-
+    """
+        Split  text to shingles of size SHINGLE_SIZE and output them as integers of fixed size
+    """
     def text_to_shingle_set(self, text):
         words = text.split()
 
@@ -25,7 +20,7 @@ class HashDriver:
 
         shingle = []
 
-        shingle_size = 10
+        shingle_size = SHINGLE_SIZE
 
         for index in range(len(words) - shingle_size + 1):
             shingle = words[index:index + shingle_size]
@@ -42,23 +37,14 @@ class HashDriver:
 
         return shingles_in_doc_ints
 
-    def minhash(self, set):
+    def create_content_hash(self, html_content):
+        try:
+            m = hashlib.sha256()
 
-        # initialize a sample minhash vector of length N
-        vec = [float('inf') for i in range(N)]
+            m.update(html_content.encode('utf-8'))
 
-        for val in set:
+            return m.hexdigest()
+        except Exception as error:
+            print("     [CRAWLING] Error while creating content hash", error)
 
-            # loop over each "permutation function"
-            for perm_idx, perm_vals in enumerate(self.perms):
-                a, b = perm_vals
-
-                # pass 'val' through the 'ith' permutation function
-                output = (a * val + b) % self.prime
-
-                # conditionally update the 'ith' value of vec
-                if vec[perm_idx] > output:
-                    vec[perm_idx] = output
-
-        # the returned vector repsresents the minimum hash of the set
-        return vec
+            return None

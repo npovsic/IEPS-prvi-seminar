@@ -49,6 +49,8 @@ MAX_NUMBER_OF_RETRIES = 5
 # Delay for retrying to fetch a page from the frontier
 DELAY = 10
 
+# Upper similarity limit of two document [0,1]
+MAX_SIMILARITY = 0.95
 
 class Crawler:
     def __init__(self, number_of_processes):
@@ -205,7 +207,7 @@ class CrawlerProcess:
 
                         self.current_page["page_type_code"] = PAGE_TYPES["duplicate"]
 
-                        self.current_page["hash_content"] = self.create_content_hash(html_content)
+                        self.current_page["hash_content"] = hash_driver.create_content_hash(html_content)
 
                     else:
                         # page is not treated as duplicate page - insert hash signature to db
@@ -216,7 +218,7 @@ class CrawlerProcess:
 
                         self.current_page["html_content"] = html_content
 
-                        self.current_page["hash_content"] = self.create_content_hash(html_content)
+                        self.current_page["hash_content"] = hash_driver.create_content_hash(html_content)
 
                         parsed_page = self.parse_page(self.current_page["html_content"])
 
@@ -634,40 +636,36 @@ class CrawlerProcess:
 
         return url
 
-    def create_content_hash(self, html_content):
-        try:
-            m = hashlib.sha256()
-
-            m.update(html_content.encode('utf-8'))
-
-            return m.hexdigest()
-        except Exception as error:
-            print("     [CRAWLING] Error while creating content hash", error)
-
-            return None
-
     """
-        TODO: use a hash algorithm that return a similar value for similar pages
         The duplicate page should not have the html_content value set, page_type_code should be DUPLICATE and
          that's it
     """
 
     def is_duplicate_page(self, html_content):
-        h = self.create_content_hash(html_content)
-        hash_set = hash_driver.text_to_shingle_set(self.remove_markups(html_content))
 
-        self.current_page["hash_signature"] = hash_set
+        # sha256 digest of complete html_content
+        h = hash_driver.create_content_hash(html_content)
 
+        # first check if page is exact copy of already parsed documents
         if database_handler.find_page_duplicate(h):
             return True
         else:
 
-            #content_signature = hash_driver.minhash(shingle_set)
+            # create set of hash shingles
+            # in order to prevent pages using lots of same tags to be treated as similar, remove html tags
+            hash_set = hash_driver.text_to_shingle_set(self.remove_markups(html_content))
 
+            # hash signature will be inserted to db later
+            self.current_page["hash_signature"] = hash_set
 
-            #print("MINHASH: ", content_signature)
-            return False
+            # calculate similarity between current document and already parsed documents using Jaccard similarity
+            similarity = database_handler.calculate_biggest_similarity(hash_set)
 
+            return similarity > MAX_SIMILARITY
+
+    """
+       Remove markup tags from html content 
+    """
     def remove_markups(self, html_content):
         return BeautifulSoup(html_content, "html.parser").text
 
