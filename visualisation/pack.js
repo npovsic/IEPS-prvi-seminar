@@ -1,45 +1,3 @@
-/**
- *
- * EXAMPLE
- * https://d3indepth.com/layouts/
- *
- **/
-
-/*
-let packLayout = d3.pack();
-
-packLayout.size([300, 300]);
-
-let rootNode = d3.hierarchy(DATA);
-
-rootNode.sum(function (d) {
-	return d.value;
-});
-
-packLayout(rootNode);
-
-let nodes = d3.select('svg#pack g')
-	.selectAll('g')
-	.data(rootNode.descendants())
-	.enter()
-	.append('g')
-	.attr('transform', function (d) {
-		return `translate(${[d.x, d.y]})`;
-	});
-
-nodes
-	.append('circle')
-	.attr('r', function (d) {
-		return d.r;
-	});
-
-nodes
-	.append('text')
-	.attr('dy', 4)
-	.text(function (d) {
-		return d.children === undefined ? d.data.name : '';
-	});*/
-
 let svg = d3.select("svg"),
 	margin = 20,
 	diameter = +svg.attr("width"),
@@ -54,7 +12,7 @@ let pack = d3.pack()
 	.size([diameter - margin, diameter - margin])
 	.padding(2);
 
-d3.json("flare.json", function(error, root) {
+d3.json("data.json", function(error, root) {
 	if (error) throw error;
 
 	root = d3.hierarchy(root)
