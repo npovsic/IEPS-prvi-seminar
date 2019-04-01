@@ -733,3 +733,52 @@ class DatabaseHandler:
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
+
+    def fetch_all_sites(self):
+        connection = None
+
+        try:
+            connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    SELECT * FROM crawldb.site
+                """
+            )
+
+            connection.commit()
+
+            return cursor.fetchall()
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("[ERROR WHILE FETCHING SITE]", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
+
+    def fetch_pages_by_site(self, site_id):
+        connection = None
+
+        try:
+            connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    SELECT * FROM crawldb.page WHERE site_id=%s
+                """,
+                (site_id,)
+            )
+
+            connection.commit()
+
+            return cursor.fetchall()
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("[ERROR WHILE FETCHING SITE]", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
