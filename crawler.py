@@ -10,9 +10,13 @@ import re
 import time
 import hashlib
 import binascii
+from hash_driver import HashDriver
 
 # Create a global database handler for all processes to share
 database_handler = DatabaseHandler(0, 100)
+
+# Create a global hash driver for creating page signatures
+hash_driver = HashDriver()
 
 # https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Complete_list_of_MIME_types
 CONTENT_TYPES = {
@@ -45,6 +49,8 @@ MAX_NUMBER_OF_RETRIES = 5
 # Delay for retrying to fetch a page from the frontier
 DELAY = 10
 
+# Upper similarity limit of two document [0,1]
+MAX_SIMILARITY = 0.95
 
 class Crawler:
     def __init__(self, number_of_processes):
@@ -201,13 +207,18 @@ class CrawlerProcess:
 
                         self.current_page["page_type_code"] = PAGE_TYPES["duplicate"]
 
-                        self.current_page["hash_content"] = self.create_content_hash(html_content)
+                        self.current_page["hash_content"] = hash_driver.create_content_hash(html_content)
+
                     else:
+                        # page is not treated as duplicate page - insert hash signature to db
+                        database_handler.insert_page_signatures(self.current_page["id"],
+                                                                self.current_page["hash_signature"])
+
                         self.current_page["page_type_code"] = PAGE_TYPES["html"]
 
                         self.current_page["html_content"] = html_content
 
-                        self.current_page["hash_content"] = self.create_content_hash(html_content)
+                        self.current_page["hash_content"] = hash_driver.create_content_hash(html_content)
 
                         parsed_page = self.parse_page(self.current_page["html_content"])
 
@@ -625,59 +636,38 @@ class CrawlerProcess:
 
         return url
 
-    def create_content_hash(self, html_content):
-        try:
-            m = hashlib.sha256()
-
-            m.update(html_content.encode('utf-8'))
-
-            return m.hexdigest()
-        except Exception as error:
-            print("     [CRAWLING] Error while creating content hash", error)
-
-            return None
-
     """
-        TODO: use a hash algorithm that return a similar value for similar pages
         The duplicate page should not have the html_content value set, page_type_code should be DUPLICATE and
          that's it
     """
 
     def is_duplicate_page(self, html_content):
-        h = self.create_content_hash(html_content)
 
-        self.text_to_shingle_set(self.remove_markups(html_content))
+        # sha256 digest of complete html_content
+        h = hash_driver.create_content_hash(html_content)
 
-        return database_handler.find_page_duplicate(h)
+        # first check if page is exact copy of already parsed documents
+        if database_handler.find_page_duplicate(h):
+            return True
+        else:
 
+            # create set of hash shingles
+            # in order to prevent pages using lots of same tags to be treated as similar, remove html tags
+            hash_set = hash_driver.text_to_shingle_set(self.remove_markups(html_content))
+
+            # hash signature will be inserted to db later
+            self.current_page["hash_signature"] = hash_set
+
+            # calculate similarity between current document and already parsed documents using Jaccard similarity
+            similarity = database_handler.calculate_biggest_similarity(hash_set)
+
+            return similarity > MAX_SIMILARITY
+
+    """
+       Remove markup tags from html content 
+    """
     def remove_markups(self, html_content):
         return BeautifulSoup(html_content, "html.parser").text
-
-    def text_to_shingle_set(self, text):
-        words = text.split()
-
-        # keeps word shingles
-        shingles_in_doc_words = set()
-
-        # keeps hashed shingles
-        shingles_in_doc_ints = set()
-
-        shingle = []
-
-        shingle_size = 5
-
-        for index in range(len(words) - shingle_size + 1):
-            shingle = words[index:index + shingle_size]
-            shingle = ' '.join(shingle)
-
-            # Hash the shingle to a 32-bit integer
-            crc = binascii.crc32(shingle.encode()) & 0xffffffff
-
-            if shingle not in shingles_in_doc_words:
-                shingles_in_doc_words.add(shingle)
-
-            if crc not in shingles_in_doc_ints:
-                shingles_in_doc_ints.add(crc)
 
     def add_page_to_frontier_array(self, page_url):
         page_domain = self.get_domain_url(page_url)
