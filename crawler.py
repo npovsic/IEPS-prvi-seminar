@@ -85,7 +85,7 @@ class CrawlerProcess:
 
         number_of_retries = 0
 
-        print("[CREATED CRAWLER PROCESS]", self.current_process_id)
+        #print("[CREATED CRAWLER PROCESS]", self.current_process_id)
 
         # Create the chrome driver with which we will fetch and parse sites
         chrome_options = webdriver.ChromeOptions()
@@ -150,7 +150,7 @@ class CrawlerProcess:
         print("[STOPPED CRAWLER PROCESS] Frontier is empty after several tries", self.current_process_id)
 
     def crawl(self):
-        print(" {} - [CRAWLING PAGE]".format(self.current_process_id), self.current_page["url"])
+        #print(" {} - [CRAWLING PAGE]".format(self.current_process_id), self.current_page["url"])
 
         domain = self.get_domain_url(self.current_page["url"])
 
@@ -168,7 +168,7 @@ class CrawlerProcess:
         self.current_page["accessed_time"] = datetime.now()
 
         if self.allowed_to_crawl_current_page(self.current_page["url"]) is False:
-            print("     [CRAWLING] Robots do not allow this page to be crawled: {}".format(self.current_page["url"]))
+            #print("     [CRAWLING] Robots do not allow this page to be crawled: {}".format(self.current_page["url"]))
 
             self.current_page["page_type_code"] = PAGE_TYPES["disallowed"]
 
@@ -268,8 +268,8 @@ class CrawlerProcess:
 
                 if data_type_code is None:
                     # The content type is not in the allowed values, therefore we can ignore it
-
-                    print("     [CRAWLING] Page response content-type is not in CONTENT_TYPES: ", content_type)
+                    testing = None
+                    #print("     [CRAWLING] Page response content-type is not in CONTENT_TYPES: ", content_type)
                 else:
                     page_data = {
                         "page_id": self.current_page["id"],
@@ -293,7 +293,7 @@ class CrawlerProcess:
         # Add all the links from the page and sitemap to the frontier
         database_handler.add_pages_to_frontier(self.pages_to_add_to_frontier)
 
-        print(" {} - [CRAWLING] Finished crawling".format(self.current_process_id))
+        #print(" {} - [CRAWLING] Finished crawling".format(self.current_process_id))
 
     """
         Fetch a response from the url, so that we get the status code and find out if any errors occur while fetching
@@ -413,18 +413,21 @@ class CrawlerProcess:
     """
 
     def parse_sitemap(self, sitemap_xml):
-        soup = BeautifulSoup(sitemap_xml, 'lxml')
+        try:
+            soup = BeautifulSoup(sitemap_xml, 'lxml')
 
-        sitemap_tags = soup.find_all("loc")
+            sitemap_tags = soup.find_all("loc")
 
-        if sitemap_tags is None:
-            return
+            if sitemap_tags is None:
+                return
 
-        for sitemap_tag in sitemap_tags:
-            url = self.get_parsed_url(sitemap_tag.text)
+            for sitemap_tag in sitemap_tags:
+                url = self.get_parsed_url(sitemap_tag.text)
 
-            if url:
-                self.add_page_to_frontier_array(url)
+                if url:
+                    self.add_page_to_frontier_array(url)
+        except Exception as error:
+            print(error)
 
     """
         Checks if robots are set for the current site and if they allow the crawling of the current page
@@ -456,8 +459,8 @@ class CrawlerProcess:
                         time_difference = (can_crawl_again_at - current_time).total_seconds()
 
                         if time_difference > 0:
-                            print("     [CRAWLING] Crawl delay has not yet elapsed for site: {}".format(
-                                self.site["domain"]))
+                            #print("     [CRAWLING] Crawl delay has not yet elapsed for site: {}".format(
+                            #   self.site["domain"]))
 
                             time.sleep(crawl_delay)
         except Exception as error:
@@ -660,6 +663,8 @@ class CrawlerProcess:
 
             # calculate similarity between current document and already parsed documents using Jaccard similarity
             similarity = database_handler.calculate_biggest_similarity(hash_set)
+
+            #print("SIMILARITY: ", similarity)
 
             return similarity > MAX_SIMILARITY
 

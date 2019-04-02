@@ -37,6 +37,7 @@ class DatabaseHandler:
             if self.connection_pool:
                 print('[DATABASE] Connection successfully established')
 
+
         except (Exception, psycopg2.DatabaseError) as error:
             print("[ERROR WHILE ESTABLISHING CONNECTION TO DATABASE]", error)
 
@@ -408,6 +409,7 @@ class DatabaseHandler:
     """
     def calculate_biggest_similarity(self, signatures):
         connection = None
+        first_matching = None
 
         try:
             connection = self.connection_pool.getconn()
@@ -443,7 +445,7 @@ class DatabaseHandler:
             if connection:
                 self.connection_pool.putconn(connection)
 
-        if first_matching[4] > 0:
+        if first_matching and first_matching[4] > 0:
 
             # calculate jaccard similarity (intersection over union)
             return first_matching[4] / (first_matching[5] - first_matching[4])
