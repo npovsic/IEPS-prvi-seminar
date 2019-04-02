@@ -810,7 +810,7 @@ class DatabaseHandler:
             if connection:
                 self.connection_pool.putconn(connection)
 
-    def fetch_links_from_specific_site(self):
+    def fetch_links_from_specific_domain(self, domain):
         connection = None
 
         try:
@@ -820,13 +820,15 @@ class DatabaseHandler:
 
             cursor.execute(
                 """
-                    SELECT m.*, u1.url, u2.url
-                    FROM crawldb.link m 
-                    INNER JOIN crawldb.page u1 ON (m.from_page = u1.id)
-                    INNER JOIN crawldb.page u2 ON (m.to_page = u2.id) 
-                    WHERE u1.site_id = 78
-                    LIMIT 1000
-                """
+                    SELECT l.*, p1.url, p2.url 
+                    FROM crawldb.link l 
+                    INNER JOIN crawldb.page p1 ON (l.from_page = p1.id)
+                    INNER JOIN crawldb.page p2 ON (l.to_page = p2.id) 
+                    INNER JOIN crawldb.site s ON (p1.site_id = s.id)
+                    WHERE s.domain=%s
+                    LIMIT 1500
+                """,
+                (domain,)
             )
 
             connection.commit()

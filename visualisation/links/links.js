@@ -1,5 +1,5 @@
 // http://blog.thomsonreuters.com/index.php/mobile-patent-suits-graphic-of-the-day/
-d3.json("links_data.json", function(error, root) {
+d3.json("data.json", function(error, root) {
 
     let links = root.links;
 
@@ -61,9 +61,6 @@ d3.json("links_data.json", function(error, root) {
         .attr("r", 10)
         .style("fill", 'hsl(174, 100%, 27%)')
 		.on("mouseover", function (d) {
-
-		    console.log("D: ", d);
-
 			tooltip.html(
 				"<p>" + d.name + "</p>"
 			)
