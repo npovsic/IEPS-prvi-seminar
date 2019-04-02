@@ -3,6 +3,12 @@
 	width: 100% !important;
 }
 
+.description {
+    text-align: justify;
+    padding-left: 20%;
+    padding-right: 20%;
+}
+
 .border-bottom {
 	border-bottom: 1px lightgray solid;
 }
@@ -14,33 +20,6 @@
 .add-top-margin {
     margin-top: 50px !important;
 }
-
-/*.node {
-	fill: steelblue;
-	opacity: 1;
-	stroke: none;
-}*/
-
-/*.link {
-	fill: none;
-	stroke: #ccc;
-	stroke-width: 1px;
-}
-
-circle {
-	fill: indianred;
-	opacity: 0.3;
-	stroke: white;
-}
-
-text {
-	font-family: "Helvetica Neue", Helvetica, sans-serif;
-	fill: white;
-	font-size: 10px;
-	text-anchor: middle;
-}*/
-
-/* _---------------------------------- */
 
 .node {
 	cursor: pointer;
