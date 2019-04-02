@@ -28,6 +28,13 @@ d3.json("data.json", function(error, root) {
 		.enter().append("circle")
 		.attr("class", function(d) { return d.parent ? d.children ? "node" : "node node--leaf" : "node node--root"; })
 		.style("fill", function(d) { return d.children ? color(d.depth) : null; })
+		//TODO: correctly manage hover event
+		.on("mouseover", function (d) {
+			console.log("HOVERED: ", d.data.name);
+			if (d.parent === root) {
+
+			}
+		})
 		.on("click", function(d) { if (focus !== d) zoom(d), d3.event.stopPropagation(); });
 
 	let text = g.selectAll("text")
@@ -58,7 +65,8 @@ d3.json("data.json", function(error, root) {
 
 		transition.selectAll("text")
 			.filter(function(d) { return d.parent === focus || this.style.display === "inline"; })
-			.style("fill-opacity", function(d) { return d.parent === focus ? 1 : 0; })
+			//TODO: here we can mangae whcih labels will change state on zoom change
+			.style("fill-opacity", function(d) { return d.parent === focus && d.children ? 1 : 0; })
 			.on("start", function(d) { if (d.parent === focus) this.style.display = "inline"; })
 			.on("end", function(d) { if (d.parent !== focus) this.style.display = "none"; });
 	}
