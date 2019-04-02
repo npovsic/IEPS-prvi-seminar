@@ -4,6 +4,12 @@
 	width: 100% !important;
 }
 
+.description {
+    text-align: justify;
+    padding-left: 20%;
+    padding-right: 20%;
+}
+
 .border-bottom {
 	border-bottom: 1px lightgray solid;
 }
