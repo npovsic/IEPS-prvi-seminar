@@ -41,8 +41,8 @@ d3.json("data_3000.json", function(error, root) {
 			if (d.data.type) {
 
 				if (d.data.type === 'DISALLOWED') return 'hsl(0, 0%, 74%)';
-				else if (d.data.type === 'ERROR') return 'hsl(1, 83%, 63%)';
-				else if (d.data.type === 'DUPLICATE') return 'hsl(46, 100%, 65%)';
+				else if (d.data.type === 'ERROR') return 'hsl(0, 73%, 77%)';
+				else if (d.data.type === 'DUPLICATE') return 'hsl(54, 100%, 88%)';
 
 			}
 
