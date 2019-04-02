@@ -1,0 +1,69 @@
+
+.wrapper {
+	text-align: center;
+	width: 100% !important;
+}
+
+.border-bottom {
+	border-bottom: 1px lightgray solid;
+}
+
+.bold {
+	font-weight: bold;
+}
+
+.add-top-margin {
+    margin-top: 50px !important;
+}
+
+circle:hover {
+	fill: #666;
+}
+
+.link {
+	fill: none;
+	stroke: #666;
+	stroke-width: 1.5px;
+}
+
+#licensing {
+	fill: green;
+}
+
+.link.licensing {
+	stroke: green;
+}
+
+.link.resolved {
+	stroke-dasharray: 0, 2 1;
+}
+
+circle {
+	fill: #ccc;
+	stroke: #333;
+	stroke-width: 1.5px;
+}
+
+text {
+	font: 10px sans-serif;
+	pointer-events: none;
+	text-shadow: 0 1px 0 #fff, 1px 0 0 #fff, 0 -1px 0 #fff, -1px 0 0 #fff;
+}
+
+div.tooltip {
+	position: absolute;
+	text-align: center;
+	width: 500px;
+	height: 80px;
+	padding: 2px;
+	font: 12px sans-serif;
+	color: white;
+	background: rgba(77,77,77,0.7);
+	border: 0px;
+	border-radius: 8px;
+	pointer-events: none;
+}
+
+.bold {
+	font-weight: bold;
+}
