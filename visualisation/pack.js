@@ -23,20 +23,51 @@ d3.json("data_3000.json", function(error, root) {
 		nodes = pack(root).descendants(),
 		view;
 
+	// tooltip
+	let tooltip = d3.select("body")
+		.append("div")
+		.attr("class", "tooltip")
+		.style("position", "absolute")
+		.style("z-index", "10")
+		.style("visibility", "hidden");
+
+
+	// define circle to present site/page
 	let circle = g.selectAll("circle")
 		.data(nodes)
 		.enter().append("circle")
 		.attr("class", function(d) { return d.parent ? d.children ? "node" : "node node--leaf" : "node node--root"; })
-		.style("fill", function(d) { return d.children ? color(d.depth) : null; })
-		//TODO: correctly manage hover event
-		.on("mouseover", function (d) {
-			console.log("HOVERED: ", d.data.name);
-			if (d.parent === root) {
+		.style("fill", function(d) {
+			if (d.data.type) {
+
+				if (d.data.type === 'DISALLOWED') return 'hsl(0, 0%, 74%)';
+				else if (d.data.type === 'ERROR') return 'hsl(1, 83%, 63%)';
+				else if (d.data.type === 'DUPLICATE') return 'hsl(46, 100%, 65%)';
 
 			}
-		})
-		.on("click", function(d) { if (focus !== d) zoom(d), d3.event.stopPropagation(); });
 
+			return d.children ? color(d.depth) : null; })
+
+		.on("mouseover", function (d) {
+			let pageType = d.data.type ? d.data.type : "";
+
+			tooltip.html(
+				"<p>" + d.data.name + "</p>" +
+				"<p class='bold'>" + pageType + "</p>"
+			)
+			tooltip.style("visibility", "visible");
+		})
+		.on("mousemove", function(){return tooltip.style("top", (event.pageY-10)+"px").style("left",(event.pageX+10)+"px");})
+		.on("mouseout", function(){return tooltip.style("visibility", "hidden");})
+		.on("click", function(d) { if (focus !== d) zoom(d), d3.event.stopPropagation(); })
+		.on("contextmenu", function (d, i) {
+			d3.event.preventDefault();
+			d3.event.stopPropagation();
+			// react on right-clicking
+			window.open(d.data.name, '_blank')
+		});
+
+	// text on circle
 	let text = g.selectAll("text")
 		.data(nodes)
 		.enter().append("text")
@@ -65,7 +96,6 @@ d3.json("data_3000.json", function(error, root) {
 
 		transition.selectAll("text")
 			.filter(function(d) { return d.parent === focus || this.style.display === "inline"; })
-			//TODO: here we can mangae whcih labels will change state on zoom change
 			.style("fill-opacity", function(d) { return d.parent === focus && d.children ? 1 : 0; })
 			.on("start", function(d) { if (d.parent === focus) this.style.display = "inline"; })
 			.on("end", function(d) { if (d.parent !== focus) this.style.display = "none"; });
