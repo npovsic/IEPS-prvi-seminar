@@ -1,4 +1,4 @@
-let svg = d3.select("svg"),
+let svg = d3.select("svg#pack"),
 	margin = 20,
 	diameter = +svg.attr("width"),
 	g = svg.append("g").attr("transform", "translate(" + diameter / 2 + "," + diameter / 2 + ")");
@@ -12,7 +12,7 @@ let pack = d3.pack()
 	.size([diameter - margin, diameter - margin])
 	.padding(2);
 
-d3.json("data.json", function(error, root) {
+d3.json("data_3000.json", function(error, root) {
 	if (error) throw error;
 
 	root = d3.hierarchy(root)
