@@ -61,3 +61,5 @@ VISUALIZATION:
     the corresponding subdirectory (visualisation/...).
     
     Note that amount of visualized data is limited due to performance and usability reasons.
+    
+#####Project contributors: Nejc Povšič, Vid Ribič, Luka Bezovšek
