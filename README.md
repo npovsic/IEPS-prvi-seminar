@@ -52,7 +52,7 @@ STEPS:
         - The script creates a Crawler class and runs it
         - The number of processes are set as an argument for the crawler
 
-VISUALISATION:
+VISUALIZATION:
 
     When you want to visualize fresh data from the database, you first have to run export.py script. It fetches data
     from the db and exports it to json files which are placed into corresponding directory. 
