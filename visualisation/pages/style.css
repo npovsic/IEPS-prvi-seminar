@@ -3,6 +3,12 @@
 	width: 100% !important;
 }
 
+.description {
+    text-align: justify;
+    padding-left: 20%;
+    padding-right: 20%;
+}
+
 .border-bottom {
 	border-bottom: 1px lightgray solid;
 }
@@ -11,32 +17,9 @@
 	font-weight: bold;
 }
 
-/*.node {
-	fill: steelblue;
-	opacity: 1;
-	stroke: none;
-}*/
-
-/*.link {
-	fill: none;
-	stroke: #ccc;
-	stroke-width: 1px;
+.add-top-margin {
+    margin-top: 50px !important;
 }
-
-circle {
-	fill: indianred;
-	opacity: 0.3;
-	stroke: white;
-}
-
-text {
-	font-family: "Helvetica Neue", Helvetica, sans-serif;
-	fill: white;
-	font-size: 10px;
-	text-anchor: middle;
-}*/
-
-/* _---------------------------------- */
 
 .node {
 	cursor: pointer;
@@ -57,10 +40,32 @@ text {
 	text-shadow: 0 1px 0 #fff, 1px 0 0 #fff, -1px 0 0 #fff, 0 -1px 0 #fff;
 }
 
+.label {
+	pointer-events: none;
+}
+
+div.tooltip {
+	position: absolute;
+	text-align: center;
+	width: 500px;
+	height: 80px;
+	padding: 2px;
+	font: 12px sans-serif;
+	color: white;
+	background: rgba(77,77,77,0.7);
+	border: 0px;
+	border-radius: 8px;
+	pointer-events: none;
+}
+
+.bold {
+	font-weight: bold;
+}
+
 .label,
 .node--root,
 .node--leaf {
-	pointer-events: none;
+	/*pointer-events: none;*/
 }
 
 

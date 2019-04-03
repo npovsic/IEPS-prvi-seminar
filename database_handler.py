@@ -377,6 +377,7 @@ class DatabaseHandler:
     """
         Insert hash signatures for current page
     """
+
     def insert_page_signatures(self, page_id, signatures):
         connection = None
 
@@ -407,6 +408,7 @@ class DatabaseHandler:
         Check out what is the percentage of similarity between current page containing set of hash signatures and 
         already crawled pages
     """
+
     def calculate_biggest_similarity(self, signatures):
         connection = None
         first_matching = None
@@ -732,6 +734,134 @@ class DatabaseHandler:
             cursor.close()
         except (Exception, psycopg2.DatabaseError) as error:
             print("[ERROR WHILE RESETTING DATABASE]", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
+
+    def fetch_all_sites(self):
+        connection = None
+
+        try:
+            connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    SELECT * FROM crawldb.site
+                """
+            )
+
+            connection.commit()
+
+            return cursor.fetchall()
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("[ERROR WHILE FETCHING SITE]", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
+
+    def fetch_all_pages(self):
+        connection = None
+
+        try:
+            connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    SELECT * FROM crawldb.page WHERE NOT page_type_code='FRONTIER'
+                """
+            )
+
+            connection.commit()
+
+            return cursor.fetchall()
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("[ERROR WHILE FETCHING PAGES]", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
+
+    def fetch_all_links(self):
+        connection = None
+
+        try:
+            connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    SELECT * FROM crawldb.link 
+                """
+            )
+
+            connection.commit()
+
+            return cursor.fetchall()
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("[ERROR WHILE FETCHING LINKS]", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
+
+    def fetch_links_from_specific_domain(self, domain):
+        connection = None
+
+        try:
+            connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    SELECT l.*, p1.url, p2.url 
+                    FROM crawldb.link l 
+                    INNER JOIN crawldb.page p1 ON (l.from_page = p1.id)
+                    INNER JOIN crawldb.page p2 ON (l.to_page = p2.id) 
+                    INNER JOIN crawldb.site s ON (p1.site_id = s.id)
+                    WHERE s.domain=%s
+                    LIMIT 1500
+                """,
+                (domain,)
+            )
+
+            connection.commit()
+
+            return cursor.fetchall()
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("[ERROR WHILE FETCHING SITE LINKS]", error)
+        finally:
+            if connection:
+                self.connection_pool.putconn(connection)
+
+    def fetch_pages_by_site(self, site_id):
+        connection = None
+
+        try:
+            connection = self.connection_pool.getconn()
+
+            cursor = connection.cursor()
+
+            cursor.execute(
+                """
+                    SELECT * FROM crawldb.page WHERE site_id=%s
+                """,
+                (site_id,)
+            )
+
+            connection.commit()
+
+            return cursor.fetchall()
+
+        except (Exception, psycopg2.DatabaseError) as error:
+            print("[ERROR WHILE FETCHING SITE]", error)
         finally:
             if connection:
                 self.connection_pool.putconn(connection)
